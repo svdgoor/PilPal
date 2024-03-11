@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:dart_openai/openai.dart';
+import 'package:dart_openai/dart_openai.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
@@ -59,7 +59,9 @@ class _ChatPageState extends State<ChatPage> {
 
       // construct chatgpt messages
       _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
-        content: messageItem.message,
+        content: [
+          OpenAIChatCompletionChoiceMessageContentItemModel.text(messageItem.message)
+        ],
         role: messageItem.role == MessageRole.ai
             ? OpenAIChatMessageRole.assistant
             : OpenAIChatMessageRole.user,
@@ -75,7 +77,9 @@ class _ChatPageState extends State<ChatPage> {
 
   void _completeChat(String prompt) async {
     _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
-      content: prompt,
+      content: [
+        OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt)
+      ],
       role: OpenAIChatMessageRole.user,
     ));
 
@@ -90,14 +94,16 @@ class _ChatPageState extends State<ChatPage> {
       // existing id: just update to the same text bubble
       if (chatResponseId == chatStreamEvent.id) {
         chatResponseContent +=
-            chatStreamEvent.choices.first.delta.content ?? '';
+            chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
 
         _addMessageStream(chatResponseContent);
 
         if (chatStreamEvent.choices.first.finishReason == "stop") {
           isAiTyping = false;
           _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
-            content: chatResponseContent,
+            content: [
+              OpenAIChatCompletionChoiceMessageContentItemModel.text(chatResponseContent)
+            ],
             role: OpenAIChatMessageRole.assistant,
           ));
           _saveMessage(chatResponseContent, MessageRole.ai);
@@ -107,7 +113,7 @@ class _ChatPageState extends State<ChatPage> {
       } else {
         // new id: create new text bubble
         chatResponseId = chatStreamEvent.id;
-        chatResponseContent = chatStreamEvent.choices.first.delta.content ?? '';
+        chatResponseContent = chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
         onMessageReceived(id: chatResponseId, message: chatResponseContent);
         isAiTyping = true;
       }
