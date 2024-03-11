@@ -60,7 +60,8 @@ class _ChatPageState extends State<ChatPage> {
       // construct chatgpt messages
       _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
         content: [
-          OpenAIChatCompletionChoiceMessageContentItemModel.text(messageItem.message)
+          OpenAIChatCompletionChoiceMessageContentItemModel.text(
+              messageItem.message)
         ],
         role: messageItem.role == MessageRole.ai
             ? OpenAIChatMessageRole.assistant
@@ -77,9 +78,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void _completeChat(String prompt) async {
     _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
-      content: [
-        OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt)
-      ],
+      content: [OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt)],
       role: OpenAIChatMessageRole.user,
     ));
 
@@ -102,7 +101,8 @@ class _ChatPageState extends State<ChatPage> {
           isAiTyping = false;
           _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
             content: [
-              OpenAIChatCompletionChoiceMessageContentItemModel.text(chatResponseContent)
+              OpenAIChatCompletionChoiceMessageContentItemModel.text(
+                  chatResponseContent)
             ],
             role: OpenAIChatMessageRole.assistant,
           ));
@@ -113,7 +113,8 @@ class _ChatPageState extends State<ChatPage> {
       } else {
         // new id: create new text bubble
         chatResponseId = chatStreamEvent.id;
-        chatResponseContent = chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
+        chatResponseContent =
+            chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
         onMessageReceived(id: chatResponseId, message: chatResponseContent);
         isAiTyping = true;
       }

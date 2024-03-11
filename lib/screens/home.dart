@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
 import '../hive_model/chat_item.dart';
 import '../shared/api_key_dialog.dart';
+import '../shared/api_files_dialog.dart';
 import 'chat_page.dart';
 
 class Home extends StatefulWidget {
@@ -36,21 +37,47 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ChatGPT Flutter'),
+        title: const Text('PilPal | Home'),
         actions: [
           IconButton(
               onPressed: () {
                 showDialog(
                     context: context, builder: (_) => const ApiKeyDialog());
               },
-              tooltip: 'Add/Update OpenAI key',
-              icon: const Icon(Icons.key))
+              tooltip: 'Add OpenAPI Key',
+              icon: const Icon(Icons.key)),
+          IconButton(
+              onPressed: () {
+                try {
+                  OpenAI.instance;
+                } on MissingApiKeyException {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text(
+                          "Can't start the question chat. API key not added."),
+                      action: SnackBarAction(
+                          label: 'Add key',
+                          onPressed: () {
+                            showDialog(
+                                context: context,
+                                builder: (_) => const ApiKeyDialog());
+                          }),
+                    ),
+                  );
+                  return;
+                }
+                showDialog(
+                    context: context, builder: (_) => const ApiFileDialog());
+              },
+              tooltip: 'OpenAI files',
+              icon: const Icon(Icons.file_copy_outlined)),
         ],
       ),
       body: ValueListenableBuilder(
           valueListenable: Hive.box('chats').listenable(),
           builder: (context, box, _) {
-            if (box.isEmpty) return const Center(child: Text('No chats yet'));
+            if (box.isEmpty)
+              return const Center(child: Text('No questions yet'));
             return ListView.builder(
               itemCount: box.length,
               itemBuilder: (context, index) {
@@ -95,7 +122,7 @@ class _HomeState extends State<Home> {
           // create hive object
           final messagesBox = Hive.box('messages');
           final newChatTitle =
-              'New Chat ${DateFormat('d/M/y').format(DateTime.now())}';
+              'Question ${DateFormat('d/M/y').format(DateTime.now())}';
           var chatItem = ChatItem(newChatTitle, HiveList(messagesBox));
 
           // add to hive
@@ -108,7 +135,7 @@ class _HomeState extends State<Home> {
             ),
           );
         },
-        label: const Text('New chat'),
+        label: const Text('New Question'),
         icon: const Icon(Icons.message_outlined),
       ),
     );
