@@ -33,6 +33,26 @@ class _HomeState extends State<Home> {
     OpenAI.apiKey = key;
   }
 
+  // Wraps a function that depends on the API being setup
+  void _apiKeyTest(Function onSuccess) {
+    try {
+      OpenAI.instance;
+      onSuccess();
+    } on MissingApiKeyException {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Can't open this page. API key not added."),
+          action: SnackBarAction(
+              label: 'Add key',
+              onPressed: () {
+                showDialog(
+                    context: context, builder: (_) => const ApiKeyDialog());
+              }),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,26 +68,14 @@ class _HomeState extends State<Home> {
               icon: const Icon(Icons.key)),
           IconButton(
               onPressed: () {
-                try {
-                  OpenAI.instance;
-                } on MissingApiKeyException {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text(
-                          "Can't start the question chat. API key not added."),
-                      action: SnackBarAction(
-                          label: 'Add key',
-                          onPressed: () {
-                            showDialog(
-                                context: context,
-                                builder: (_) => const ApiKeyDialog());
-                          }),
+                _apiKeyTest(() {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ApiFileDialog(),
                     ),
                   );
-                  return;
-                }
-                showDialog(
-                    context: context, builder: (_) => const ApiFileDialog());
+                });
               },
               tooltip: 'OpenAI files',
               icon: const Icon(Icons.file_copy_outlined)),
@@ -76,8 +84,9 @@ class _HomeState extends State<Home> {
       body: ValueListenableBuilder(
           valueListenable: Hive.box('chats').listenable(),
           builder: (context, box, _) {
-            if (box.isEmpty)
+            if (box.isEmpty) {
               return const Center(child: Text('No questions yet'));
+            }
             return ListView.builder(
               itemCount: box.length,
               itemBuilder: (context, index) {
@@ -101,39 +110,23 @@ class _HomeState extends State<Home> {
           }),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          try {
-            OpenAI.instance;
-          } on MissingApiKeyException {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text("Can't start the chat. API key not added."),
-                action: SnackBarAction(
-                    label: 'Add key',
-                    onPressed: () {
-                      showDialog(
-                          context: context,
-                          builder: (_) => const ApiKeyDialog());
-                    }),
+          _apiKeyTest(() {
+            // create hive object
+            final messagesBox = Hive.box('messages');
+            final newChatTitle =
+                'Question ${DateFormat('d/M/y').format(DateTime.now())}';
+            var chatItem = ChatItem(newChatTitle, HiveList(messagesBox));
+
+            // add to hive
+            Hive.box('chats').add(chatItem);
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatPage(chatItem: chatItem),
               ),
             );
-            return;
-          }
-
-          // create hive object
-          final messagesBox = Hive.box('messages');
-          final newChatTitle =
-              'Question ${DateFormat('d/M/y').format(DateTime.now())}';
-          var chatItem = ChatItem(newChatTitle, HiveList(messagesBox));
-
-          // add to hive
-          Hive.box('chats').add(chatItem);
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatPage(chatItem: chatItem),
-            ),
-          );
+          });
         },
         label: const Text('New Question'),
         icon: const Icon(Icons.message_outlined),
