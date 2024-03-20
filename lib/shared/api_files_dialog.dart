@@ -5,24 +5,18 @@ import 'package:dart_openai/dart_openai.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../screens/home.dart';
+
 class ApiFileDialog extends StatefulWidget {
-  const ApiFileDialog({super.key});
+  final List<MedicineFile> files;
+
+  const ApiFileDialog({super.key, required this.files});
 
   @override
-  State<ApiFileDialog> createState() => _ApiFileDialogState();
-}
-
-class MedicineFile {
-  String medicineName;
-  final OpenAIFileModel file;
-
-  MedicineFile({required this.medicineName, required this.file});
+  _ApiFileDialogState createState() => _ApiFileDialogState();
 }
 
 class _ApiFileDialogState extends State<ApiFileDialog> {
-  final TextEditingController apiKeyController = TextEditingController();
-  List<MedicineFile> files = [];
-
   Future<void> _uploadFile(FilePickerResult? value) async {
     if (value == null) {
       _showNoFileSelectedWarning();
@@ -36,7 +30,7 @@ class _ApiFileDialogState extends State<ApiFileDialog> {
             purpose: "assistants",
           );
           setState(() {
-            files.add(MedicineFile(
+            widget.files.add(MedicineFile(
                 medicineName: uploadedFile.fileName, file: uploadedFile));
           });
         } else {
@@ -68,9 +62,9 @@ class _ApiFileDialogState extends State<ApiFileDialog> {
           children: [
             ListView.builder(
               shrinkWrap: true,
-              itemCount: files.length,
+              itemCount: widget.files.length,
               itemBuilder: (context, index) {
-                MedicineFile medicineFile = files[index];
+                MedicineFile medicineFile = widget.files[index];
                 return ListTile(
                   title: Text(medicineFile.medicineName),
                   trailing: Row(
@@ -161,9 +155,8 @@ class _ApiFileDialogState extends State<ApiFileDialog> {
   }
 
   void _deleteFile(int index) {
-    // Placeholder function for deleting files
     setState(() {
-      files.removeAt(index);
+      widget.files.removeAt(index);
     });
   }
 

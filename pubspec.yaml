@@ -38,6 +38,7 @@ dependencies:
   flutter_chat_types: ^3.6.0
   # https://github.com/anasfik/openai/issues/57
   dart_openai: ^5.1.0
+  chat_gpt_sdk: ^3.0.0
   shared_preferences: ^2.1.0
   url_launcher: ^6.1.10
   hive: ^2.2.3

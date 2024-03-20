@@ -45,3 +45,5 @@ app.*.map.json
 .firebase/hosting.YnVpbGRcd2Vi.cache
 
 .vscode/settings.json
+
+pubspec.lock

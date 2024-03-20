@@ -12,9 +12,11 @@ import '../hive_model/message_item.dart';
 import '../hive_model/message_role.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, required this.chatItem});
+  const ChatPage({super.key, required this.chatItem, required this.file});
 
   final ChatItem chatItem;
+
+  final OpenAIFileModel? file;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -61,7 +63,7 @@ class _ChatPageState extends State<ChatPage> {
       _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
         content: [
           OpenAIChatCompletionChoiceMessageContentItemModel.text(
-              messageItem.message)
+              messageItem.message),
         ],
         role: messageItem.role == MessageRole.ai
             ? OpenAIChatMessageRole.assistant
