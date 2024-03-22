@@ -94,13 +94,50 @@ class _HomeState extends State<Home> {
                       newai.OpenAI.instance = newai.OpenAI.instance.build(
                         token: okey!,
                       );
-                      return _showAssistantsAvailable(newai.OpenAI.instance);
+                      return _assistantSetupPrompt(newai.OpenAI.instance);
                     });
               });
             },
             tooltip: 'Assistants',
             icon: const Icon(Icons.people_alt_outlined),
-          )
+          ),
+          IconButton(
+              onPressed: () {
+                newai.OpenAI.instance = newai.OpenAI.instance.build(
+                  token: okey!,
+                );
+                showDialog(
+                    context: context,
+                    builder: (_) {
+                      return AlertDialog(
+                        title: const Text('Translate'),
+                        content: FutureBuilder(
+                          future: newai.OpenAI.instance.onCompletion(
+                            request: newai.CompleteText(
+                                prompt: '<text>',
+                                maxTokens: 200,
+                                model: newai.Gpt3TurboInstruct()),
+                          ),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const CircularProgressIndicator();
+                            }
+                            if (snapshot.hasError) {
+                              return Text('Error: ${snapshot.error}');
+                            }
+                            final response = snapshot.data;
+                            if (response == null) {
+                              return const Text('Error, data is null');
+                            }
+                            return Text(response.choices.first.text);
+                          },
+                        ),
+                      );
+                    });
+              },
+              tooltip: 'Test chat_gpt_sdk',
+              icon: const Icon(Icons.chat_bubble_outline)),
         ],
       ),
       body: ValueListenableBuilder(
@@ -148,61 +185,113 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Widget _showAssistantsAvailable(newai.OpenAI instance) {
+  Widget _assistantSetupPrompt(newai.OpenAI instance) {
+    Text title;
+    if (assistant != null) {
+      title = Text('Assistant already selected: ${assistant!.assistant.name}');
+    } else {
+      title = const Text('Select an assistant');
+    }
     return AlertDialog(
-      title: const Text('Assistants'),
-      // use newai.OpenAI.instance.assistant.list()
-      content: FutureBuilder(
-        future: instance.assistant.list(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const CircularProgressIndicator();
-          }
-          if (snapshot.hasError) {
-            return Text('Error: ${snapshot.error}');
-          }
-          final assistants = snapshot.data;
-          if (assistants == null) {
-            return const Text('Error, data is null');
-          }
-          if (assistants.isEmpty) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  'No assistants available',
-                  style: TextStyle(
-                    fontSize: 16,
+      title: title,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FutureBuilder(
+            future: instance.assistant.list(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const CircularProgressIndicator();
+              }
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              }
+              final assistants = snapshot.data;
+              if (assistants == null) {
+                return const Text('Error, data is null');
+              }
+              if (assistants.isEmpty) {
+                return Column(
+                  children: [
+                    const Text(
+                      'No assistants available',
+                      style: TextStyle(
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        assistant = await MedicineAssistant.createNewAssistant(
+                            instance, assistantName);
+                        if (!context.mounted) return;
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text('Create a new assistant'),
+                    ),
+                  ],
+                );
+              }
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Select an assistant',
+                    style: TextStyle(
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () async {
-                    assistant = await MedicineAssistant.createNewAssistant(
-                        instance, assistantName);
-                  },
-                  child: const Text('Create a new assistant'),
-                ),
-              ],
-            );
-          }
-          return ListView.builder(
-            shrinkWrap: true,
-            itemCount: assistants.length,
-            itemBuilder: (context, index) {
-              final assistantData = assistants[index];
-              return ListTile(
-                title: Text(assistantData.name),
-                subtitle: Text(assistantData.id),
-                onTap: () async {
-                  assistant = await MedicineAssistant.recreateAssistant(
-                      instance, assistantData.id);
-                },
+                  DropdownButton<newai.AssistantData>(
+                    value: null,
+                    items: assistants
+                        .map((e) => DropdownMenuItem(
+                              value: e,
+                              child: Column(
+                                children: [
+                                  Text(
+                                    e.name,
+                                    style: const TextStyle(fontSize: 18),
+                                  ),
+                                  Text(
+                                    e.id,
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (value) async {
+                      if (value == null) return;
+                      assistant = await MedicineAssistant.recreateAssistant(
+                          instance, value.id);
+                      if (!context.mounted) return;
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      assistant = await MedicineAssistant.createNewAssistant(
+                          instance, assistantName);
+                      if (!context.mounted) return;
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Create a new assistant'),
+                  ),
+                ],
               );
             },
-          );
-        },
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Cancel'),
+          ),
+        ],
       ),
     );
   }

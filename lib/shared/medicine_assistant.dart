@@ -21,26 +21,18 @@ class MedicineAssistant {
   static Future<MedicineAssistant> createNewAssistant(
       OpenAI instance, String assistantName) async {
     print('assistantName: $assistantName');
-    final AssistantData assistantData = await instance.assistant.create(
-      assistant: Assistant(
-        model: Gpt4AModel(),
-        instructions: assistantInstruction,
-        name: assistantName,
-        tools: [
-          {"type": "retrieval"}
-        ],
-      ),
+    final Assistant assistant = Assistant(
+      model: Gpt4AModel(),
+      instructions: assistantInstruction,
+      name: assistantName,
+      // tools: [
+      //   {"type": "retrieval"}
+      // ],
     );
+    final AssistantData assistantData =
+        await instance.assistant.create(assistant: assistant);
     return MedicineAssistant(
-      Assistant(
-        model: Gpt4AModel(),
-        instructions: assistantInstruction,
-        name: assistantName,
-        tools: [
-          {"type": "retrieval"}
-        ],
-        fileIds: [],
-      ),
+      assistant,
       assistantData.id,
       [],
     );
