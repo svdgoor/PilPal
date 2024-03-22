@@ -1,4 +1,5 @@
 import 'package:dart_openai/dart_openai.dart';
+import 'package:chat_gpt_sdk/chat_gpt_sdk.dart' as newai;
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +9,7 @@ import '../constants.dart';
 import '../hive_model/chat_item.dart';
 import '../shared/api_key_dialog.dart';
 import '../shared/api_files_dialog.dart';
+import '../shared/medicine_assistant.dart';
 import 'chat_page.dart';
 
 class Home extends StatefulWidget {
@@ -20,6 +22,8 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   List<ChatItem> chats = [];
   List<MedicineFile> files = [];
+  MedicineAssistant? assistant;
+  String? okey;
 
   @override
   void initState() {
@@ -32,6 +36,7 @@ class _HomeState extends State<Home> {
     var key = sp.getString(spOpenApiKey);
     if (key == null || key.isEmpty) return;
     OpenAI.apiKey = key;
+    okey = key;
   }
 
   // Wraps a function that depends on the API being setup
@@ -80,6 +85,22 @@ class _HomeState extends State<Home> {
               },
               tooltip: 'OpenAI files',
               icon: const Icon(Icons.file_copy_outlined)),
+          IconButton(
+            onPressed: () {
+              _apiKeyTest(() {
+                showDialog(
+                    context: context,
+                    builder: (_) {
+                      newai.OpenAI.instance = newai.OpenAI.instance.build(
+                        token: okey!,
+                      );
+                      return _showAssistantsAvailable(newai.OpenAI.instance);
+                    });
+              });
+            },
+            tooltip: 'Assistants',
+            icon: const Icon(Icons.people_alt_outlined),
+          )
         ],
       ),
       body: ValueListenableBuilder(
@@ -123,6 +144,65 @@ class _HomeState extends State<Home> {
         },
         label: const Text('New Question'),
         icon: const Icon(Icons.message_outlined),
+      ),
+    );
+  }
+
+  Widget _showAssistantsAvailable(newai.OpenAI instance) {
+    return AlertDialog(
+      title: const Text('Assistants'),
+      // use newai.OpenAI.instance.assistant.list()
+      content: FutureBuilder(
+        future: instance.assistant.list(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const CircularProgressIndicator();
+          }
+          if (snapshot.hasError) {
+            return Text('Error: ${snapshot.error}');
+          }
+          final assistants = snapshot.data;
+          if (assistants == null) {
+            return const Text('Error, data is null');
+          }
+          if (assistants.isEmpty) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  'No assistants available',
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    assistant = await MedicineAssistant.createNewAssistant(
+                        instance, assistantName);
+                  },
+                  child: const Text('Create a new assistant'),
+                ),
+              ],
+            );
+          }
+          return ListView.builder(
+            shrinkWrap: true,
+            itemCount: assistants.length,
+            itemBuilder: (context, index) {
+              final assistantData = assistants[index];
+              return ListTile(
+                title: Text(assistantData.name),
+                subtitle: Text(assistantData.id),
+                onTap: () async {
+                  assistant = await MedicineAssistant.recreateAssistant(
+                      instance, assistantData.id);
+                },
+              );
+            },
+          );
+        },
       ),
     );
   }
