@@ -2,7 +2,6 @@ import 'package:dart_openai/dart_openai.dart';
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart' as newai;
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants.dart';
@@ -21,9 +20,8 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   List<ChatItem> chats = [];
-  List<MedicineFile> files = [];
   MedicineAssistant? assistant;
-  String? okey;
+  newai.OpenAI? instance;
 
   @override
   void initState() {
@@ -36,27 +34,7 @@ class _HomeState extends State<Home> {
     var key = sp.getString(spOpenApiKey);
     if (key == null || key.isEmpty) return;
     OpenAI.apiKey = key;
-    okey = key;
-  }
-
-  // Wraps a function that depends on the API being setup
-  void _apiKeyTest(Function onSuccess) {
-    try {
-      OpenAI.instance;
-      onSuccess();
-    } on MissingApiKeyException {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Can't open this page. API key not added."),
-          action: SnackBarAction(
-              label: 'Add key',
-              onPressed: () {
-                showDialog(
-                    context: context, builder: (_) => const ApiKeyDialog());
-              }),
-        ),
-      );
-    }
+    instance = newai.OpenAI.instance.build(token: key);
   }
 
   @override
@@ -68,19 +46,33 @@ class _HomeState extends State<Home> {
           IconButton(
               onPressed: () {
                 showDialog(
-                    context: context, builder: (_) => const ApiKeyDialog());
+                    context: context,
+                    builder: (_) => ApiKeyDialog(
+                          onApiKeyChange: (key) {
+                            setState(() {
+                              instance = newai.OpenAI.instance.build(
+                                token: key,
+                              );
+                            });
+                          },
+                        ));
               },
               tooltip: 'Add OpenAPI Key',
               icon: const Icon(Icons.key)),
           IconButton(
               onPressed: () {
                 _apiKeyTest(() {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ApiFileDialog(files: files),
-                    ),
-                  );
+                  _assistantTest(() {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ApiFilePage(
+                          assistant: assistant!,
+                          instance: instance!,
+                        ),
+                      ),
+                    );
+                  });
                 });
               },
               tooltip: 'OpenAI files',
@@ -91,9 +83,6 @@ class _HomeState extends State<Home> {
                 showDialog(
                     context: context,
                     builder: (_) {
-                      newai.OpenAI.instance = newai.OpenAI.instance.build(
-                        token: okey!,
-                      );
                       return _assistantSetupPrompt(newai.OpenAI.instance);
                     });
               });
@@ -103,9 +92,6 @@ class _HomeState extends State<Home> {
           ),
           IconButton(
               onPressed: () {
-                newai.OpenAI.instance = newai.OpenAI.instance.build(
-                  token: okey!,
-                );
                 showDialog(
                     context: context,
                     builder: (_) {
@@ -185,12 +171,76 @@ class _HomeState extends State<Home> {
     );
   }
 
+  // Wraps a function that depends on the API being setup
+  void _apiKeyTest(Function onSuccess) {
+    if (instance == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+            SnackBar(
+              content: const Text("Can't open this page. API key not added."),
+              action: SnackBarAction(
+                  label: 'Add key',
+                  onPressed: () {
+                    showDialog(
+                        context: context,
+                        builder: (_) => ApiKeyDialog(
+                              onApiKeyChange: (key) {
+                                setState(() {
+                                  instance = newai.OpenAI.instance.build(
+                                    token: key,
+                                  );
+                                });
+                              },
+                            ));
+                  }),
+            ),
+          )
+          .closed
+          .then((reason) {
+        if (instance != null) {
+          onSuccess();
+        }
+      });
+    } else {
+      onSuccess();
+    }
+  }
+
+  void _assistantTest(Function onSuccess) {
+    if (assistant == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Can't open this page. Assistant not selected."),
+          action: SnackBarAction(
+              label: 'Select assistant',
+              onPressed: () {
+                showDialog(
+                    context: context,
+                    builder: (_) =>
+                        _assistantSetupPrompt(newai.OpenAI.instance)).then(
+                  (value) {
+                    if (assistant != null) {
+                      onSuccess();
+                    }
+                  },
+                );
+              }),
+        ),
+      );
+    } else {
+      onSuccess();
+    }
+  }
+
   Widget _assistantSetupPrompt(newai.OpenAI instance) {
     Text title;
+    Text subtitle;
     if (assistant != null) {
-      title = Text('Assistant already selected: ${assistant!.assistant.name}');
+      title = Text('${assistant!.assistant.name} selected');
+      subtitle = const Text('Select a different assistant');
     } else {
-      title = const Text('Select an assistant');
+      title = const Text('Assistant Selection');
+      subtitle = const Text('Select an assistant');
     }
     return AlertDialog(
       title: title,
@@ -236,12 +286,7 @@ class _HomeState extends State<Home> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'Select an assistant',
-                    style: TextStyle(
-                      fontSize: 16,
-                    ),
-                  ),
+                  subtitle,
                   DropdownButton<newai.AssistantData>(
                     value: null,
                     items: assistants
@@ -300,7 +345,8 @@ class _HomeState extends State<Home> {
   // Alternatively, you can go to the file upload page
   // Alternatively, you can ask a general question
   Widget _buildPickMedicineFileDialog() {
-    return AlertDialog(
+    return AlertDialog();
+    /*
       title: const Text('Ask a question'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -308,9 +354,9 @@ class _HomeState extends State<Home> {
           if (files.isEmpty) const Text('No files uploaded yet'),
           if (files.isNotEmpty)
             const Text('Pick a medicine file to ask a question about'),
-          DropdownButton<MedicineFile>(
+          DropdownButton<FileContainer>(
             value: null,
-            items: files
+            items: assistant!.files
                 .map((e) => DropdownMenuItem(
                       value: e,
                       child: Text(e.medicineName),
@@ -331,13 +377,15 @@ class _HomeState extends State<Home> {
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ApiFileDialog(files: files),
-                ),
-              );
+              _assistantTest(() {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ApiFilePage(assistant: assistant!),
+                  ),
+                );
+              });
             },
             child: const Text('Upload a new file'),
           ),
@@ -366,12 +414,6 @@ class _HomeState extends State<Home> {
         ],
       ),
     );
+    */
   }
-}
-
-class MedicineFile {
-  String medicineName;
-  final OpenAIFileModel file;
-
-  MedicineFile({required this.medicineName, required this.file});
 }
