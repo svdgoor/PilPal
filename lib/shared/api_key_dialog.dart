@@ -1,4 +1,3 @@
-import 'package:dart_openai/dart_openai.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,7 +5,9 @@ import '../constants.dart';
 import '../utils/link_launcher.dart';
 
 class ApiKeyDialog extends StatefulWidget {
-  const ApiKeyDialog({super.key});
+  final Function(String) onApiKeyChange;
+
+  const ApiKeyDialog({super.key, required this.onApiKeyChange});
 
   @override
   State<ApiKeyDialog> createState() => _ApiKeyDialogState();
@@ -56,10 +57,11 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
               var prefs = await SharedPreferences.getInstance();
               debugPrint('Entered ket: ${apiKeyController.text}');
 
-              OpenAI.apiKey = apiKeyController.text;
+              widget.onApiKeyChange(apiKeyController.text);
 
               await prefs.setString(spOpenApiKey, apiKeyController.text);
 
+              if (!context.mounted) return;
               Navigator.pop(context);
             },
             child: const Text('Save')),

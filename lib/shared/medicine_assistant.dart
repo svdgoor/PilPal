@@ -9,8 +9,10 @@ class MedicineAssistant {
   Assistant assistant;
   String assistantID;
   List<FileContainer> files;
+  OpenAI instance;
 
-  MedicineAssistant(this.assistant, this.assistantID, this.files);
+  MedicineAssistant(
+      this.assistant, this.assistantID, this.files, this.instance);
 
   static Future<Iterable<Map<String, dynamic>>> listAssistant(
       OpenAI instance) async {
@@ -20,7 +22,6 @@ class MedicineAssistant {
 
   static Future<MedicineAssistant> createNewAssistant(
       OpenAI instance, String assistantName) async {
-    print('assistantName: $assistantName');
     final Assistant assistant = Assistant(
       model: Gpt4AModel(),
       instructions: assistantInstruction,
@@ -35,6 +36,7 @@ class MedicineAssistant {
       assistant,
       assistantData.id,
       [],
+      instance,
     );
   }
 
@@ -42,18 +44,18 @@ class MedicineAssistant {
       OpenAI instance, String assistantID) async {
     List<FileContainer> files = await listAssistantFiles(assistantID, instance);
     return MedicineAssistant(
-      Assistant(
-        model: Gpt4AModel(),
-        instructions: assistantInstruction,
-        name: assistantName,
-        tools: [
-          {"type": "retrieval"}
-        ],
-        fileIds: files.map((file) => file.id).toList(),
-      ),
-      assistantID,
-      files,
-    );
+        Assistant(
+          model: Gpt4AModel(),
+          instructions: assistantInstruction,
+          name: assistantName,
+          tools: [
+            {"type": "retrieval"}
+          ],
+          fileIds: files.map((file) => file.id).toList(),
+        ),
+        assistantID,
+        files,
+        instance);
   }
 
   static Future<List<FileContainer>> listAssistantFiles(

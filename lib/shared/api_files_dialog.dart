@@ -1,42 +1,28 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:dart_openai/dart_openai.dart';
+import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
-import '../screens/home.dart';
+import 'medicine_assistant.dart';
 
-class ApiFileDialog extends StatefulWidget {
-  final List<MedicineFile> files;
+class ApiFilePage extends StatefulWidget {
+  final MedicineAssistant assistant;
+  final OpenAI instance;
 
-  const ApiFileDialog({super.key, required this.files});
+  const ApiFilePage(
+      {super.key, required this.assistant, required this.instance});
 
   @override
-  _ApiFileDialogState createState() => _ApiFileDialogState();
+  _ApiFilePageState createState() => _ApiFilePageState();
 }
 
-class _ApiFileDialogState extends State<ApiFileDialog> {
+class _ApiFilePageState extends State<ApiFilePage> {
   Future<void> _uploadFile(FilePickerResult? value) async {
     if (value == null) {
       _showNoFileSelectedWarning();
     } else {
-      for (var i = 0; i < value.files.length; i++) {
-        var file = value.files[i];
-        if (file.path != null) {
-          // Upload a file
-          OpenAIFileModel uploadedFile = await OpenAI.instance.file.upload(
-            file: File(file.path!),
-            purpose: "assistants",
-          );
-          setState(() {
-            widget.files.add(MedicineFile(
-                medicineName: uploadedFile.fileName, file: uploadedFile));
-          });
-        } else {
-          _showNullPathError(i);
-        }
-      }
+      widget.assistant.addFilesToAssistant(value.files, widget.instance);
     }
   }
 
@@ -62,11 +48,11 @@ class _ApiFileDialogState extends State<ApiFileDialog> {
           children: [
             ListView.builder(
               shrinkWrap: true,
-              itemCount: widget.files.length,
+              itemCount: widget.assistant.files.length,
               itemBuilder: (context, index) {
-                MedicineFile medicineFile = widget.files[index];
+                FileContainer medicineFile = widget.assistant.files[index];
                 return ListTile(
-                  title: Text(medicineFile.medicineName),
+                  title: Text(medicineFile.name),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -107,7 +93,7 @@ class _ApiFileDialogState extends State<ApiFileDialog> {
                               title: const Text('Edit Medicine Name'),
                               content: TextField(
                                 controller: textEditingController
-                                  ..text = medicineFile.medicineName,
+                                  ..text = medicineFile.name,
                               ),
                               actions: [
                                 TextButton(
@@ -117,7 +103,7 @@ class _ApiFileDialogState extends State<ApiFileDialog> {
                                 TextButton(
                                   onPressed: () {
                                     setState(() {
-                                      medicineFile.medicineName =
+                                      medicineFile.name =
                                           textEditingController.text;
                                     });
                                     Navigator.pop(context);
@@ -156,7 +142,7 @@ class _ApiFileDialogState extends State<ApiFileDialog> {
 
   void _deleteFile(int index) {
     setState(() {
-      widget.files.removeAt(index);
+      widget.assistant.files.removeAt(index);
     });
   }
 
