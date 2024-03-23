@@ -6,6 +6,7 @@ import 'hive_model/message_item.dart';
 import 'hive_model/message_role.dart';
 import 'screens/home.dart';
 
+
 void main() async {
   await Hive.initFlutter();
   Hive.registerAdapter(ChatItemAdapter());
