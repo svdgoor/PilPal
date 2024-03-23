@@ -1,6 +1,6 @@
-import 'package:dart_openai/dart_openai.dart';
-import 'package:chat_gpt_sdk/chat_gpt_sdk.dart' as newai;
+import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,7 +21,7 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   List<ChatItem> chats = [];
   MedicineAssistant? assistant;
-  newai.OpenAI? instance;
+  OpenAI? instance;
 
   @override
   void initState() {
@@ -33,8 +33,7 @@ class _HomeState extends State<Home> {
     final sp = await SharedPreferences.getInstance();
     var key = sp.getString(spOpenApiKey);
     if (key == null || key.isEmpty) return;
-    OpenAI.apiKey = key;
-    instance = newai.OpenAI.instance.build(token: key);
+    instance = OpenAI.instance.build(token: key);
   }
 
   @override
@@ -50,7 +49,7 @@ class _HomeState extends State<Home> {
                     builder: (_) => ApiKeyDialog(
                           onApiKeyChange: (key) {
                             setState(() {
-                              instance = newai.OpenAI.instance.build(
+                              instance = OpenAI.instance.build(
                                 token: key,
                               );
                             });
@@ -59,6 +58,19 @@ class _HomeState extends State<Home> {
               },
               tooltip: 'Add OpenAPI Key',
               icon: const Icon(Icons.key)),
+          IconButton(
+            onPressed: () {
+              _apiKeyTest(() {
+                showDialog(
+                    context: context,
+                    builder: (_) {
+                      return _assistantSetupPrompt(OpenAI.instance);
+                    });
+              });
+            },
+            tooltip: 'Assistants',
+            icon: const Icon(Icons.people_alt_outlined),
+          ),
           IconButton(
               onPressed: () {
                 _apiKeyTest(() {
@@ -78,19 +90,6 @@ class _HomeState extends State<Home> {
               tooltip: 'OpenAI files',
               icon: const Icon(Icons.file_copy_outlined)),
           IconButton(
-            onPressed: () {
-              _apiKeyTest(() {
-                showDialog(
-                    context: context,
-                    builder: (_) {
-                      return _assistantSetupPrompt(newai.OpenAI.instance);
-                    });
-              });
-            },
-            tooltip: 'Assistants',
-            icon: const Icon(Icons.people_alt_outlined),
-          ),
-          IconButton(
               onPressed: () {
                 showDialog(
                     context: context,
@@ -98,11 +97,11 @@ class _HomeState extends State<Home> {
                       return AlertDialog(
                         title: const Text('Translate'),
                         content: FutureBuilder(
-                          future: newai.OpenAI.instance.onCompletion(
-                            request: newai.CompleteText(
+                          future: OpenAI.instance.onCompletion(
+                            request: CompleteText(
                                 prompt: '<text>',
                                 maxTokens: 200,
-                                model: newai.Gpt3TurboInstruct()),
+                                model: Gpt3TurboInstruct()),
                           ),
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==
@@ -159,10 +158,12 @@ class _HomeState extends State<Home> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           _apiKeyTest(() {
-            showDialog(
-              context: context,
-              builder: (_) => _buildPickMedicineFileDialog(),
-            );
+            _assistantTest(() {
+              showDialog(
+                context: context,
+                builder: (_) => _buildPickMedicineFileDialog(),
+              );
+            });
           });
         },
         label: const Text('New Question'),
@@ -186,7 +187,7 @@ class _HomeState extends State<Home> {
                         builder: (_) => ApiKeyDialog(
                               onApiKeyChange: (key) {
                                 setState(() {
-                                  instance = newai.OpenAI.instance.build(
+                                  instance = OpenAI.instance.build(
                                     token: key,
                                   );
                                 });
@@ -215,9 +216,9 @@ class _HomeState extends State<Home> {
               label: 'Select assistant',
               onPressed: () {
                 showDialog(
-                    context: context,
-                    builder: (_) =>
-                        _assistantSetupPrompt(newai.OpenAI.instance)).then(
+                        context: context,
+                        builder: (_) => _assistantSetupPrompt(OpenAI.instance))
+                    .then(
                   (value) {
                     if (assistant != null) {
                       onSuccess();
@@ -232,7 +233,7 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Widget _assistantSetupPrompt(newai.OpenAI instance) {
+  Widget _assistantSetupPrompt(OpenAI instance) {
     Text title;
     Text subtitle;
     if (assistant != null) {
@@ -287,7 +288,7 @@ class _HomeState extends State<Home> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   subtitle,
-                  DropdownButton<newai.AssistantData>(
+                  DropdownButton<AssistantData>(
                     value: null,
                     items: assistants
                         .map((e) => DropdownMenuItem(
