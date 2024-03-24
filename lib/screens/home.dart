@@ -1,6 +1,5 @@
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -26,7 +25,24 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    setApiKeyOnStartup();
+    // try to build state as we start the app
+    setApiKeyOnStartup().then((_) async {
+      _apiKeyTest(() async {
+        if (assistant == null) {
+          final value = await MedicineAssistant.listAssistant(instance!);
+          if (value.isEmpty || value.length > 1) {
+            return;
+          }
+          assistant = await MedicineAssistant.recreateAssistant(
+              instance!, value.first['id'] as String);
+          if (!context.mounted) return;
+          setState(() {});
+        }
+        _assistantTest(() {
+          assistant!.retrieveAndStoreAssistantFiles();
+        });
+      });
+    });
   }
 
   Future<void> setApiKeyOnStartup() async {
@@ -283,13 +299,20 @@ class _HomeState extends State<Home> {
                   ],
                 );
               }
+              AssistantData? selectedAssistantData;
+              for (var element in assistants) {
+                if (assistant != null && element.id == assistant!.assistantID) {
+                  selectedAssistantData = element;
+                  break;
+                }
+              }
               return Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   subtitle,
                   DropdownButton<AssistantData>(
-                    value: null,
+                    value: selectedAssistantData,
                     items: assistants
                         .map((e) => DropdownMenuItem(
                               value: e,
