@@ -42,7 +42,8 @@ class MedicineAssistant {
 
   static Future<MedicineAssistant> recreateAssistant(
       OpenAI instance, String assistantID) async {
-    List<FileContainer> files = await listAssistantFiles(assistantID, instance);
+    List<FileContainer> files =
+        await retrieveAssistantFilesByID(assistantID, instance);
     return MedicineAssistant(
         Assistant(
           model: Gpt4AModel(),
@@ -58,13 +59,21 @@ class MedicineAssistant {
         instance);
   }
 
-  static Future<List<FileContainer>> listAssistantFiles(
+  static Future<List<FileContainer>> retrieveAssistantFilesByID(
       String assistantID, OpenAI instance) async {
     final ListAssistantFile files =
         await instance.assistant.listFile(assistantId: assistantID);
     return files.data
         .map((data) => FileContainer(data.object, data.id))
         .toList();
+  }
+
+  Future<List<FileContainer>> retrieveAssistantFiles() async {
+    return await retrieveAssistantFilesByID(assistantID, instance);
+  }
+
+  void retrieveAndStoreAssistantFiles() async {
+    files = await retrieveAssistantFiles();
   }
 
   void addFilesToAssistant(List<PlatformFile> newFiles, OpenAI instance) async {

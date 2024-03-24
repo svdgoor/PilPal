@@ -18,6 +18,12 @@ class ApiFilePage extends StatefulWidget {
 }
 
 class _ApiFilePageState extends State<ApiFilePage> {
+  @override
+  void initState() {
+    super.initState();
+    widget.assistant.retrieveAndStoreAssistantFiles();
+  }
+
   Future<void> _uploadFile(FilePickerResult? value) async {
     if (value == null) {
       _showNoFileSelectedWarning();
