@@ -28,7 +28,40 @@ class _ApiFilePageState extends State<ApiFilePage> {
     if (value == null) {
       _showNoFileSelectedWarning();
     } else {
-      widget.assistant.addFilesToAssistant(value.files, widget.instance);
+      List<PlatformFile>? succeededFiles = await widget.assistant
+          .addFilesToAssistant(value.files, widget.instance);
+      if (!mounted) return;
+      if (succeededFiles == null) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error'),
+            content: const Text(
+                'Failed to upload files. Are you on web? If so, please use the app or windows to upload files.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Success'),
+            content: Text(
+                'Successfully uploaded ${succeededFiles.length} files: ${succeededFiles.map((e) => e.name).join(', ')}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -46,6 +79,34 @@ class _ApiFilePageState extends State<ApiFilePage> {
               });
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.file_download_done),
+            onPressed: () {
+              // Retrieve and show in a textbox which files are uploaded
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Uploaded Files'),
+                  content: FutureBuilder<List<FileContainer>>(
+                    future: widget.assistant.retrieveAssistantFiles(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const CircularProgressIndicator();
+                      } else if (snapshot.hasError) {
+                        return Text('Error: ${snapshot.error}');
+                      } else if (snapshot.hasData == false ||
+                          snapshot.data!.isEmpty) {
+                        return const Text('No files uploaded');
+                      } else {
+                        List<FileContainer> files = snapshot.data ?? [];
+                        return Text(files.map((e) => e.name).join('\n'));
+                      }
+                    },
+                  ),
+                ),
+              );
+            },
+          )
         ],
       ),
       body: Column(
@@ -78,43 +139,12 @@ class _ApiFilePageState extends State<ApiFilePage> {
                                 ),
                                 TextButton(
                                   onPressed: () {
-                                    _deleteFile(index);
+                                    widget.assistant.removeFileFromAssistant(
+                                        medicineFile, widget.instance);
+                                    setState(() {/* Refresh the list */});
                                     Navigator.pop(context);
                                   },
                                   child: const Text('Delete'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () {
-                          TextEditingController textEditingController =
-                              TextEditingController();
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Edit Medicine Name'),
-                              content: TextField(
-                                controller: textEditingController
-                                  ..text = medicineFile.name,
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('Cancel'),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      medicineFile.name =
-                                          textEditingController.text;
-                                    });
-                                    Navigator.pop(context);
-                                  },
-                                  child: const Text('Save'),
                                 ),
                               ],
                             ),
@@ -144,12 +174,6 @@ class _ApiFilePageState extends State<ApiFilePage> {
         ],
       ),
     );
-  }
-
-  void _deleteFile(int index) {
-    setState(() {
-      widget.assistant.files.removeAt(index);
-    });
   }
 
   void _showNoFileSelectedWarning() {

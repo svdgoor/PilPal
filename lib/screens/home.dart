@@ -1,5 +1,6 @@
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,23 +26,37 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
+    debugPrint("Home page init");
     // try to build state as we start the app
     setApiKeyOnStartup().then((_) async {
-      _apiKeyTest(() async {
-        if (assistant == null) {
-          final value = await MedicineAssistant.listAssistant(instance!);
-          if (value.isEmpty || value.length > 1) {
-            return;
-          }
-          assistant = await MedicineAssistant.recreateAssistant(
-              instance!, value.first['id'] as String);
-          if (!context.mounted) return;
-          setState(() {});
+      tryLoadAssistant();
+    });
+  }
+
+  Future<void> tryLoadAssistant() async {
+    debugPrint("Attempting to load assistant");
+    _apiKeyTest(false, () async {
+      debugPrint("API key set, checking assistant");
+      if (assistant == null) {
+        debugPrint("Assistant not loaded, attempting to load");
+        List<AssistantData> value =
+            await MedicineAssistant.listAssistant(instance!);
+        debugPrint(
+            "Retrieved assistants: ${value.map((assistant) => assistant.name).toList()}");
+        if (value.isEmpty || value.length > 1) {
+          return;
         }
-        _assistantTest(() {
-          assistant!.retrieveAndStoreAssistantFiles();
-        });
+        assistant = await MedicineAssistant.recreateAssistant(
+            instance!, value.first.id);
+        debugPrint("Assistant loaded: ${assistant!.assistant.name}");
+        debugPrint(
+            "Files: ${assistant!.files.map((e) => "${e.name} (${e.id})").join(', ')}");
+      }
+      _assistantTest(false, () {
+        assistant!.retrieveAndStoreAssistantFiles();
       });
+    }, onFailure: () {
+      debugPrint("API key not set");
     });
   }
 
@@ -69,6 +84,7 @@ class _HomeState extends State<Home> {
                                 token: key,
                               );
                             });
+                            tryLoadAssistant();
                           },
                         ));
               },
@@ -76,7 +92,7 @@ class _HomeState extends State<Home> {
               icon: const Icon(Icons.key)),
           IconButton(
             onPressed: () {
-              _apiKeyTest(() {
+              _apiKeyTest(true, () {
                 showDialog(
                     context: context,
                     builder: (_) {
@@ -89,8 +105,8 @@ class _HomeState extends State<Home> {
           ),
           IconButton(
               onPressed: () {
-                _apiKeyTest(() {
-                  _assistantTest(() {
+                _apiKeyTest(true, () {
+                  _assistantTest(true, () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -173,8 +189,8 @@ class _HomeState extends State<Home> {
           }),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          _apiKeyTest(() {
-            _assistantTest(() {
+          _apiKeyTest(true, () {
+            _assistantTest(true, () {
               showDialog(
                 context: context,
                 builder: (_) => _buildPickMedicineFileDialog(),
@@ -189,8 +205,12 @@ class _HomeState extends State<Home> {
   }
 
   // Wraps a function that depends on the API being setup
-  void _apiKeyTest(Function onSuccess) {
+  void _apiKeyTest(bool notify, Function onSuccess, {Function? onFailure}) {
     if (instance == null) {
+      if (onFailure != null) {
+        onFailure();
+      }
+      if (!notify) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(
             SnackBar(
@@ -223,8 +243,9 @@ class _HomeState extends State<Home> {
     }
   }
 
-  void _assistantTest(Function onSuccess) {
+  void _assistantTest(bool notify, Function onSuccess) {
     if (assistant == null) {
+      if (!notify) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("Can't open this page. Assistant not selected."),
@@ -301,7 +322,8 @@ class _HomeState extends State<Home> {
               }
               AssistantData? selectedAssistantData;
               for (var element in assistants) {
-                if (assistant != null && element.id == assistant!.assistantID) {
+                if (assistant != null &&
+                    element.id == assistant!.assistant.id) {
                   selectedAssistantData = element;
                   break;
                 }
