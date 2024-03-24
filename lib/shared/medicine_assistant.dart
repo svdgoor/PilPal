@@ -8,35 +8,29 @@ import 'package:flutter/foundation.dart';
 import '../constants.dart';
 
 class MedicineAssistant {
-  Assistant assistant;
-  String assistantID;
+  AssistantData assistant;
   List<FileContainer> files;
   OpenAI instance;
 
-  MedicineAssistant(
-      this.assistant, this.assistantID, this.files, this.instance);
+  MedicineAssistant(this.assistant, this.files, this.instance);
 
-  static Future<Iterable<Map<String, dynamic>>> listAssistant(
-      OpenAI instance) async {
-    final assistants = await instance.assistant.list();
-    return assistants.map((e) => e.toJson());
+  static Future<List<AssistantData>> listAssistant(OpenAI instance) async {
+    return await instance.assistant.list();
   }
 
   static Future<MedicineAssistant> createNewAssistant(
       OpenAI instance, String assistantName) async {
-    final Assistant assistant = Assistant(
-      model: Gpt4AModel(),
+    final AssistantData assistantData = await instance.assistant.create(
+        assistant: Assistant(
+      model: AssistantModelFromValue(model: openAIModel),
       instructions: assistantInstruction,
       name: assistantName,
-      // tools: [
-      //   {"type": "retrieval"}
-      // ],
-    );
-    final AssistantData assistantData =
-        await instance.assistant.create(assistant: assistant);
+      tools: [
+        {"type": "retrieval"}
+      ],
+    ));
     return MedicineAssistant(
-      assistant,
-      assistantData.id,
+      assistantData,
       [],
       instance,
     );
@@ -44,45 +38,40 @@ class MedicineAssistant {
 
   static Future<MedicineAssistant> recreateAssistant(
       OpenAI instance, String assistantID) async {
-    List<FileContainer> files =
+    final AssistantData assistantData =
+        await instance.assistant.retrieves(assistantId: assistantID);
+    final List<FileContainer> files =
         await retrieveAssistantFilesByID(assistantID, instance);
-    return MedicineAssistant(
-        Assistant(
-          model: Gpt4AModel(),
-          instructions: assistantInstruction,
-          name: assistantName,
-          tools: [
-            {"type": "retrieval"}
-          ],
-          fileIds: files.map((file) => file.id).toList(),
-        ),
-        assistantID,
-        files,
-        instance);
+    return MedicineAssistant(assistantData, files, instance);
   }
 
   static Future<List<FileContainer>> retrieveAssistantFilesByID(
       String assistantID, OpenAI instance) async {
     final ListAssistantFile files =
         await instance.assistant.listFile(assistantId: assistantID);
-    return files.data
-        .map((data) => FileContainer(data.object, data.id))
-        .toList();
+    List<FileContainer> fileContainers = [];
+    for (AssistantFileData file in files.data) {
+      final UploadResponse fileData = await instance.file.retrieve(file.id);
+      fileContainers.add(FileContainer(fileData.filename, file.id));
+    }
+    return fileContainers;
   }
 
   Future<List<FileContainer>> retrieveAssistantFiles() async {
-    return await retrieveAssistantFilesByID(assistantID, instance);
+    return await retrieveAssistantFilesByID(assistant.id, instance);
   }
 
   void retrieveAndStoreAssistantFiles() async {
     files = await retrieveAssistantFiles();
   }
 
-  void addFilesToAssistant(List<PlatformFile> newFiles, OpenAI instance) async {
+  Future<List<PlatformFile>?> addFilesToAssistant(
+      List<PlatformFile> newFiles, OpenAI instance) async {
     if (kIsWeb) {
       debugPrint('Cannot upload files on web platform');
-      return;
+      return null;
     }
+    List<PlatformFile> uploadedFiles = [];
     for (PlatformFile f in newFiles) {
       if (files.any((element) => element.name == f.name)) continue;
       final File file = File(f.path!);
@@ -94,32 +83,35 @@ class MedicineAssistant {
         file: FileInfo(file.path, f.name),
         purpose: 'assistants',
       ));
+      uploadedFiles.add(f);
       files.add(FileContainer(f.name, fileUpload.id));
     }
-    _updateAssistantFiles(instance);
+    try {
+      await _updateAssistantFiles(instance);
+    } catch (e) {
+      debugPrint('Error updating assistant files: $e');
+      return null;
+    }
+    return uploadedFiles;
   }
 
-  void removeFileFromAssistant(FileContainer file, OpenAI instance) async {
+  Future<void> removeFileFromAssistant(
+      FileContainer file, OpenAI instance) async {
     await instance.file.delete(file.id);
     files.remove(file);
     _updateAssistantFiles(instance);
   }
 
-  void _updateAssistantFiles(OpenAI instance) async {
-    assistant = Assistant(
-      model: Gpt4AModel(),
-      instructions: assistant.instructions,
-      name: assistant.name,
-      tools: [
-        {"type": "retrieval"}
-      ],
-      fileIds: files.map((file) => file.id).toList(),
-    );
-    final AssistantData assistantData = await instance.assistant.modifies(
-      assistantId: assistantID,
-      assistant: assistant,
-    );
-    assistantID = assistantData.id;
+  Future<void> _updateAssistantFiles(OpenAI instance) async {
+    await instance.assistant.modifies(
+        assistantId: assistant.id,
+        assistant: Assistant(
+          model: AssistantModelFromValue(model: openAIModel),
+          instructions: assistant.instructions,
+          name: assistant.name,
+          tools: assistant.tools,
+          fileIds: files.map((e) => e.id).toList(),
+        ));
   }
 }
 
