@@ -97,21 +97,26 @@ class MedicineAssistant {
 
   Future<void> removeFileFromAssistant(
       FileContainer file, OpenAI instance) async {
-    await instance.file.delete(file.id);
+    await instance.assistant
+        .deleteFile(assistantId: assistant.id, fileId: file.id);
     files.remove(file);
     _updateAssistantFiles(instance);
   }
 
   Future<void> _updateAssistantFiles(OpenAI instance) async {
-    await instance.assistant.modifies(
-        assistantId: assistant.id,
-        assistant: Assistant(
-          model: AssistantModelFromValue(model: openAIModel),
-          instructions: assistant.instructions,
-          name: assistant.name,
-          tools: assistant.tools,
-          fileIds: files.map((e) => e.id).toList(),
-        ));
+    try {
+      await instance.assistant.modifies(
+          assistantId: assistant.id,
+          assistant: Assistant(
+            model: AssistantModelFromValue(model: openAIModel),
+            instructions: assistant.instructions,
+            name: assistant.name,
+            tools: assistant.tools,
+            fileIds: files.map((e) => e.id).toList(),
+          ));
+    } catch (e) {
+      debugPrint('Error updating assistant files: $e');
+    }
   }
 }
 

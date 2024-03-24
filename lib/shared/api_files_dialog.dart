@@ -74,37 +74,24 @@ class _ApiFilePageState extends State<ApiFilePage> {
           IconButton(
             icon: const Icon(Icons.cloud_upload),
             onPressed: () {
-              FilePicker.platform.pickFiles().then((value) {
+              FilePicker.platform.pickFiles().then((value) async {
                 _uploadFile(value);
+                List<FileContainer> files =
+                    await widget.assistant.retrieveAssistantFiles();
+                setState(() {
+                  widget.assistant.files = files;
+                });
               });
             },
           ),
           IconButton(
-            icon: const Icon(Icons.file_download_done),
-            onPressed: () {
-              // Retrieve and show in a textbox which files are uploaded
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Uploaded Files'),
-                  content: FutureBuilder<List<FileContainer>>(
-                    future: widget.assistant.retrieveAssistantFiles(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const CircularProgressIndicator();
-                      } else if (snapshot.hasError) {
-                        return Text('Error: ${snapshot.error}');
-                      } else if (snapshot.hasData == false ||
-                          snapshot.data!.isEmpty) {
-                        return const Text('No files uploaded');
-                      } else {
-                        List<FileContainer> files = snapshot.data ?? [];
-                        return Text(files.map((e) => e.name).join('\n'));
-                      }
-                    },
-                  ),
-                ),
-              );
+            icon: const Icon(Icons.replay_outlined),
+            onPressed: () async {
+              List<FileContainer> files =
+                  await widget.assistant.retrieveAssistantFiles();
+              setState(() {
+                widget.assistant.files = files;
+              });
             },
           )
         ],
@@ -138,10 +125,17 @@ class _ApiFilePageState extends State<ApiFilePage> {
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
-                                  onPressed: () {
+                                  onPressed: () async {
                                     widget.assistant.removeFileFromAssistant(
                                         medicineFile, widget.instance);
-                                    setState(() {/* Refresh the list */});
+                                    List<FileContainer> files = await widget
+                                        .assistant
+                                        .retrieveAssistantFiles();
+                                    setState(() {
+                                      widget.assistant.files = files;
+                                    });
+                                    if (!mounted) return;
+                                    // ignore: use_build_context_synchronously
                                     Navigator.pop(context);
                                   },
                                   child: const Text('Delete'),
@@ -157,22 +151,6 @@ class _ApiFilePageState extends State<ApiFilePage> {
               },
             )
           ]),
-    );
-  }
-
-  void _showNullPathError(int fileNumber) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Warning'),
-        content: Text('File path for file ${fileNumber + 1} is null'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
     );
   }
 
