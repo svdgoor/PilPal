@@ -170,12 +170,17 @@ class _HomeState extends State<Home> {
                 return ListTile(
                   title: Text(chatItem.title),
                   onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) {
-                      return ChatPage(
-                        chatItem: chatItem,
-                        file: null,
-                      );
-                    }));
+                    _apiKeyTest(true, () {
+                      _assistantTest(true, () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) {
+                          return ChatPage(
+                            chatItem: chatItem,
+                            assistant: assistant!,
+                            instance: instance!,
+                          );
+                        }));
+                      });
+                    });
                   },
                   trailing: IconButton(
                     icon: const Icon(Icons.delete),

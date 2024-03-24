@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:dart_openai/dart_openai.dart';
+// import 'package:dart_openai/dart_openai.dart';
+import 'package:chat_gpt_sdk/chat_gpt_sdk.dart' as newOpenAI;
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
@@ -10,13 +11,18 @@ import 'package:hive/hive.dart';
 import '../hive_model/chat_item.dart';
 import '../hive_model/message_item.dart';
 import '../hive_model/message_role.dart';
+import '../shared/medicine_assistant.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, required this.chatItem, required this.file});
+  const ChatPage(
+      {super.key,
+      required this.chatItem,
+      required this.assistant,
+      required this.instance});
 
+  final MedicineAssistant assistant;
+  final newOpenAI.OpenAI instance;
   final ChatItem chatItem;
-
-  final OpenAIFileModel? file;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -39,6 +45,10 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    final newOpenAI.ThreadRequest thread = newOpenAI.ThreadRequest(
+      messages: 
+    );
+    newOpenAI.OpenAI.instance.threads.createThread(request: thread);
     ai = const types.User(id: 'ai', firstName: 'AI');
     user = const types.User(id: 'user', firstName: 'You');
 
