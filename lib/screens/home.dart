@@ -196,9 +196,18 @@ class _HomeState extends State<Home> {
         onPressed: () {
           _apiKeyTest(true, () {
             _assistantTest(true, () {
-              showDialog(
-                context: context,
-                builder: (_) => _buildPickMedicineFileDialog(),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatPage(
+                    chatItem: ChatItem(
+                      'New Question',
+                      HiveList(Hive.box('messages')),
+                    ),
+                    assistant: assistant!,
+                    instance: instance!,
+                  ),
+                ),
               );
             });
           });
@@ -390,81 +399,5 @@ class _HomeState extends State<Home> {
         ],
       ),
     );
-  }
-
-  // Pick a file from the files list to ask a question about that medicine
-  // Alternatively, you can go to the file upload page
-  // Alternatively, you can ask a general question
-  Widget _buildPickMedicineFileDialog() {
-    return AlertDialog();
-    /*
-      title: const Text('Ask a question'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (files.isEmpty) const Text('No files uploaded yet'),
-          if (files.isNotEmpty)
-            const Text('Pick a medicine file to ask a question about'),
-          DropdownButton<FileContainer>(
-            value: null,
-            items: assistant!.files
-                .map((e) => DropdownMenuItem(
-                      value: e,
-                      child: Text(e.medicineName),
-                    ))
-                .toList(),
-            onChanged: (value) {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatPage(
-                      chatItem: ChatItem(
-                          value!.medicineName, HiveList(Hive.box('messages'))),
-                      file: value.file),
-                ),
-              );
-            },
-          ),
-          TextButton(
-            onPressed: () {
-              _assistantTest(() {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ApiFilePage(assistant: assistant!),
-                  ),
-                );
-              });
-            },
-            child: const Text('Upload a new file'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _apiKeyTest(() {
-                final messagesBox = Hive.box('messages');
-                final newChatTitle =
-                    'Question ${DateFormat('d/M/y').format(DateTime.now())}';
-                var chatItem = ChatItem(newChatTitle, HiveList(messagesBox));
-                Hive.box('chats').add(chatItem);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatPage(
-                      chatItem: chatItem,
-                      file: null,
-                    ),
-                  ),
-                );
-              });
-            },
-            child: const Text('Ask a general question'),
-          ),
-        ],
-      ),
-    );
-    */
   }
 }

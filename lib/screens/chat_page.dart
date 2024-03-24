@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 
-// import 'package:dart_openai/dart_openai.dart';
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart' as newOpenAI;
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
@@ -30,7 +29,7 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final List<types.Message> _messages = [];
-  final List<OpenAIChatCompletionChoiceMessageModel> _aiMessages = [];
+  final List<newOpenAI.Messages> _aiMessages = [];
   late types.User ai;
   late types.User user;
   late Box messageBox;
@@ -45,10 +44,6 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    final newOpenAI.ThreadRequest thread = newOpenAI.ThreadRequest(
-      messages: 
-    );
-    newOpenAI.OpenAI.instance.threads.createThread(request: thread);
     ai = const types.User(id: 'ai', firstName: 'AI');
     user = const types.User(id: 'user', firstName: 'You');
 
@@ -70,14 +65,11 @@ class _ChatPageState extends State<ChatPage> {
       _messages.insert(0, textMessage);
 
       // construct chatgpt messages
-      _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
-        content: [
-          OpenAIChatCompletionChoiceMessageContentItemModel.text(
-              messageItem.message),
-        ],
+      _aiMessages.add(newOpenAI.Messages(
+        content: messageItem.message,
         role: messageItem.role == MessageRole.ai
-            ? OpenAIChatMessageRole.assistant
-            : OpenAIChatMessageRole.user,
+            ? newOpenAI.Role.assistant
+            : newOpenAI.Role.user,
       ));
     }
   }
@@ -89,48 +81,60 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _completeChat(String prompt) async {
-    _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
-      content: [OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt)],
-      role: OpenAIChatMessageRole.user,
+    _aiMessages.add(newOpenAI.Messages(
+      role: newOpenAI.Role.user,
+      content: prompt,
     ));
 
-    Stream<OpenAIStreamChatCompletionModel> chatStream =
-        OpenAI.instance.chat.createStream(
-      model: "gpt-3.5-turbo",
-      messages: _aiMessages,
-    );
+    newOpenAI.CreateThreadAndRunData data = await widget.instance.threads.runs
+        .createThreadAndRun(
+            request: newOpenAI.CreateThreadAndRun(
+                assistantId: widget.assistant.assistant.id,
+                thread: {
+          "messages": _aiMessages,
+        }));
+    newOpenAI.CreateRunResponse? runResponse;
+    while (runResponse == null ||
+        runResponse.status == "queued" ||
+        runResponse.status == "in_progress") {
+      runResponse = await widget.instance.threads.runs
+          .retrieveRun(runId: data.id, threadId: data.threadId);
+    }
+    String mId = runResponse.stepDetails!.messageCreation.messageId;
 
-    chatStream.listen((chatStreamEvent) {
-      debugPrint(chatStreamEvent.toString());
-      // existing id: just update to the same text bubble
-      if (chatResponseId == chatStreamEvent.id) {
-        chatResponseContent +=
-            chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
+    newOpenAI.MessageData mData = await widget.instance.threads.messages
+        .retrieveMessage(threadId: data.threadId, messageId: mId);
 
-        _addMessageStream(chatResponseContent);
+    debugPrint(mData.toJson().toString());
+    //   // existing id: just update to the same text bubble
+    //   if (chatResponseId == chatStreamEvent.id) {
+    //     chatResponseContent +=
+    //         chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
 
-        if (chatStreamEvent.choices.first.finishReason == "stop") {
-          isAiTyping = false;
-          _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
-            content: [
-              OpenAIChatCompletionChoiceMessageContentItemModel.text(
-                  chatResponseContent)
-            ],
-            role: OpenAIChatMessageRole.assistant,
-          ));
-          _saveMessage(chatResponseContent, MessageRole.ai);
-          chatResponseId = '';
-          chatResponseContent = '';
-        }
-      } else {
-        // new id: create new text bubble
-        chatResponseId = chatStreamEvent.id;
-        chatResponseContent =
-            chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
-        onMessageReceived(id: chatResponseId, message: chatResponseContent);
-        isAiTyping = true;
-      }
-    });
+    //     _addMessageStream(chatResponseContent);
+
+    //     if (chatStreamEvent.choices.first.finishReason == "stop") {
+    //       isAiTyping = false;
+    //       _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
+    //         content: [
+    //           OpenAIChatCompletionChoiceMessageContentItemModel.text(
+    //               chatResponseContent)
+    //         ],
+    //         role: OpenAIChatMessageRole.assistant,
+    //       ));
+    //       _saveMessage(chatResponseContent, MessageRole.ai);
+    //       chatResponseId = '';
+    //       chatResponseContent = '';
+    //     }
+    //   } else {
+    //     // new id: create new text bubble
+    //     chatResponseId = chatStreamEvent.id;
+    //     chatResponseContent =
+    //         chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
+    //     onMessageReceived(id: chatResponseId, message: chatResponseContent);
+    //     isAiTyping = true;
+    //   }
+    // });
   }
 
   void onMessageReceived({String? id, required String message}) {
@@ -173,9 +177,9 @@ class _ChatPageState extends State<ChatPage> {
       id: randomString(),
       text: message.text,
     );
-
+    debugPrint("User message: ${message.text}");
     _addMessage(textMessage);
-    _saveMessage(message.text, MessageRole.user);
+    // _saveMessage(message.text, MessageRole.user);
     _completeChat(message.text);
   }
 
