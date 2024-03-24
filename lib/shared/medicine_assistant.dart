@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 
 import '../constants.dart';
 
@@ -77,12 +79,22 @@ class MedicineAssistant {
   }
 
   void addFilesToAssistant(List<PlatformFile> newFiles, OpenAI instance) async {
-    for (var file in newFiles) {
+    if (kIsWeb) {
+      debugPrint('Cannot upload files on web platform');
+      return;
+    }
+    for (PlatformFile f in newFiles) {
+      if (files.any((element) => element.name == f.name)) continue;
+      final File file = File(f.path!);
+      if (file.existsSync() == false) {
+        debugPrint('Error uploading file, could not find path: ${f.path}');
+        continue;
+      }
       UploadResponse fileUpload = await instance.file.uploadFile(UploadFile(
-        file: FileInfo(file.path!, file.name),
+        file: FileInfo(file.path, f.name),
         purpose: 'assistants',
       ));
-      files.add(FileContainer(file.name, fileUpload.id));
+      files.add(FileContainer(f.name, fileUpload.id));
     }
     _updateAssistantFiles(instance);
   }
