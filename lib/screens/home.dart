@@ -46,8 +46,10 @@ class _HomeState extends State<Home> {
         if (value.isEmpty || value.length > 1) {
           return;
         }
+        // setstate uipdate
         assistant = await MedicineAssistant.recreateAssistant(
             instance!, value.first.id);
+        setState(() {/* Update tiles with assistant */});
         debugPrint("Assistant loaded: ${assistant!.assistant.name}");
         debugPrint(
             "Files: ${assistant!.files.map((e) => "${e.name} (${e.id})").join(', ')}");
