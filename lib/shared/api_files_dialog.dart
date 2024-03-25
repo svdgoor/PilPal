@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../utils/link_launcher.dart';
 import 'medicine_assistant.dart';
 
 class ApiFilePage extends StatefulWidget {
@@ -74,14 +76,47 @@ class _ApiFilePageState extends State<ApiFilePage> {
           IconButton(
             icon: const Icon(Icons.cloud_upload),
             onPressed: () {
-              FilePicker.platform.pickFiles().then((value) async {
-                _uploadFile(value);
-                List<FileContainer> files =
-                    await widget.assistant.retrieveAssistantFiles();
-                setState(() {
-                  widget.assistant.files = files;
+              if (kIsWeb) {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Warning: Web uploads not supported'),
+                    content: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Text('Uploading files is not supported on the web.'),
+                          Text(
+                              'Please use the app, or windows application, or website to upload files.'),
+                        ]),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          try {
+                            LinkLauncher.launch(
+                                "https://platform.openai.com/assistants");
+                          } catch (_) {/* ignore */}
+                        },
+                        child: const Text('Open in browser'),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                FilePicker.platform.pickFiles().then((value) async {
+                  _uploadFile(value);
+                  List<FileContainer> files =
+                      await widget.assistant.retrieveAssistantFiles();
+                  setState(() {
+                    widget.assistant.files = files;
+                  });
                 });
-              });
+              }
             },
           ),
           IconButton(
