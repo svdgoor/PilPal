@@ -83,22 +83,22 @@ class _ChatPageState extends State<ChatPage> {
     ));
 
     debugPrint("Prompt: $prompt");
-    var m = {"messages": []};
+    var m = {"messages": []}; // TODO implement
     for (var message in _aiMessages) {
       m["messages"]!.add({
-        "role": message.role == Role.assistant ? "assistant" : "user",
+        "role": "user", // Note: AI does not seem to be allowed but it works
         "content": message.content,
       });
     }
-    debugPrint(m.toString());
+    // debugPrint(m.toString());
     CreateThreadAndRunData data = await widget.instance.threads.runs
         .createThreadAndRun(
             request: CreateThreadAndRun(
-                assistantId: widget.assistant.assistant.id, thread: m));
+                assistantId: widget.assistant.assistant.id, thread: null));
 
     // start timer for timeout
     bool cancel = false;
-    Timer timer = Timer(const Duration(seconds: 20), () {
+    Timer timer = Timer(const Duration(minutes: 1), () {
       debugPrint("Timeout");
       cancel = true;
     });
@@ -130,39 +130,49 @@ class _ChatPageState extends State<ChatPage> {
       });
       return;
     }
-    debugPrint("Run completed successfully, retrieving message...");
 
-    ListRun? stepDetails;
-    while (stepDetails == null ||
-        stepDetails.data.last.stepDetails == null ||
-        stepDetails.data.last.stepDetails!.messageCreation == null) {
-      stepDetails = await widget.instance.threads.runs
-          .listRunSteps(threadId: data.threadId, runId: data.id);
-      if (cancel) {
-        debugPrint("Retrieving run timed out (20s)");
+    debugPrint("Run completed successfully, retrieving message...");
+    String? messageID = runResponse.stepDetails?.messageCreation?.messageId;
+
+    if (messageID == null) {
+      ListRun? stepDetails;
+      while (stepDetails == null ||
+          stepDetails.data.last.stepDetails == null ||
+          stepDetails.data.last.stepDetails!.messageCreation == null) {
+        stepDetails = await widget.instance.threads.runs
+            .listRunSteps(threadId: data.threadId, runId: data.id);
+        // ignore: unnecessary_null_comparison
+        debugPrint(
+            "Run: ${stepDetails.toJson()}, bools: ${stepDetails == null}, ${stepDetails.data.last.stepDetails == null}, ${stepDetails.data.last.stepDetails!.messageCreation == null}");
+        if (stepDetails.data.last.stepDetails != null) {
+          debugPrint("StepDetails: ${stepDetails.toJson()}");
+        }
+        if (cancel) {
+          debugPrint("Retrieving run timed out (20s)");
+          setState(() {
+            isAiTyping = false;
+          });
+          return;
+        }
+      }
+      if (stepDetails.data.last.stepDetails!.messageCreation == null) {
+        debugPrint("No message creation");
+        timer.cancel();
         setState(() {
           isAiTyping = false;
         });
         return;
       }
-    }
-    if (stepDetails.data.last.stepDetails!.messageCreation == null) {
-      debugPrint("No message creation");
+      debugPrint("Message created successfully");
       timer.cancel();
-      setState(() {
-        isAiTyping = false;
-      });
-      return;
-    }
-    debugPrint("Message created successfully");
-    timer.cancel();
 
-    String messageId =
-        stepDetails.data.last.stepDetails!.messageCreation!.messageId;
-    debugPrint("Message ID: $messageId");
+      messageID = stepDetails.data.last.stepDetails!.messageCreation!.messageId;
+    }
+
+    debugPrint("Message ID: $messageID");
 
     MessageData mData = await widget.instance.threads.messages
-        .retrieveMessage(threadId: data.threadId, messageId: messageId);
+        .retrieveMessage(threadId: data.threadId, messageId: messageID);
 
     String chatResponseContent = mData.content
         .map((content) => content.text)
@@ -173,7 +183,7 @@ class _ChatPageState extends State<ChatPage> {
 
     _addMessage(types.TextMessage(
       author: ai,
-      id: messageId,
+      id: messageID,
       text: chatResponseContent,
       createdAt: DateTime.now().millisecondsSinceEpoch,
     ));
