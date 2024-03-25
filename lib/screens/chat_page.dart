@@ -37,9 +37,6 @@ class _ChatPageState extends State<ChatPage> {
 
   late String appBarTitle;
 
-  var chatResponseId = '';
-  var chatResponseContent = '';
-
   bool isAiTyping = false;
 
   @override
@@ -86,13 +83,18 @@ class _ChatPageState extends State<ChatPage> {
     ));
 
     debugPrint("Prompt: $prompt");
+    var m = {"messages": []};
+    for (var message in _aiMessages) {
+      m["messages"]!.add({
+        "role": message.role == Role.assistant ? "assistant" : "user",
+        "content": message.content,
+      });
+    }
+    debugPrint(m.toString());
     CreateThreadAndRunData data = await widget.instance.threads.runs
         .createThreadAndRun(
             request: CreateThreadAndRun(
-                assistantId: widget.assistant.assistant.id,
-                thread: {
-          "messages": _aiMessages,
-        }));
+                assistantId: widget.assistant.assistant.id, thread: m));
 
     // start timer for timeout
     bool cancel = false;
@@ -101,7 +103,9 @@ class _ChatPageState extends State<ChatPage> {
       cancel = true;
     });
 
-    isAiTyping = true;
+    setState(() {
+      isAiTyping = true;
+    });
 
     CreateRunResponse? runResponse;
     while (runResponse == null ||
@@ -111,7 +115,9 @@ class _ChatPageState extends State<ChatPage> {
           .retrieveRun(runId: data.id, threadId: data.threadId);
       if (cancel) {
         debugPrint("Retrieving run timed out (20s)");
-        isAiTyping = false;
+        setState(() {
+          isAiTyping = false;
+        });
         return;
       }
     }
@@ -119,7 +125,9 @@ class _ChatPageState extends State<ChatPage> {
     if (runResponse.status != "completed") {
       debugPrint("Run failed! Status: ${runResponse.status}");
       timer.cancel();
-      isAiTyping = false;
+      setState(() {
+        isAiTyping = false;
+      });
       return;
     }
     debugPrint("Run completed successfully, retrieving message...");
@@ -132,14 +140,18 @@ class _ChatPageState extends State<ChatPage> {
           .listRunSteps(threadId: data.threadId, runId: data.id);
       if (cancel) {
         debugPrint("Retrieving run timed out (20s)");
-        isAiTyping = false;
+        setState(() {
+          isAiTyping = false;
+        });
         return;
       }
     }
     if (stepDetails.data.last.stepDetails!.messageCreation == null) {
       debugPrint("No message creation");
       timer.cancel();
-      isAiTyping = false;
+      setState(() {
+        isAiTyping = false;
+      });
       return;
     }
     debugPrint("Message created successfully");
@@ -157,32 +169,24 @@ class _ChatPageState extends State<ChatPage> {
         .where((element) => element != null)
         .map((text) => text!.value)
         .join(' ');
-    // TODO: mData.content.first.text!.annotations
     debugPrint("Response text: $chatResponseContent");
 
-    _addMessageStream(chatResponseContent);
-
+    _addMessage(types.TextMessage(
+      author: ai,
+      id: messageId,
+      text: chatResponseContent,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    ));
     _aiMessages.add(Messages(
-      content: chatResponseContent,
       role: Role.assistant,
+      content: chatResponseContent,
     ));
 
     _saveMessage(chatResponseContent, MessageRole.ai);
 
-    chatResponseId = '';
-    chatResponseContent = '';
-
-    isAiTyping = false;
-  }
-
-  void onMessageReceived({String? id, required String message}) {
-    var newMessage = types.TextMessage(
-      author: ai,
-      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      text: message,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-    );
-    _addMessage(newMessage);
+    setState(() {
+      isAiTyping = false;
+    });
   }
 
   // add new bubble to chat
@@ -200,14 +204,6 @@ class _ChatPageState extends State<ChatPage> {
     widget.chatItem.save();
   }
 
-  // modify last bubble in chat
-  void _addMessageStream(String message) {
-    setState(() {
-      _messages.first =
-          (_messages.first as types.TextMessage).copyWith(text: message);
-    });
-  }
-
   void _handleSendPressed(types.PartialText message) async {
     final textMessage = types.TextMessage(
       author: user,
@@ -217,7 +213,7 @@ class _ChatPageState extends State<ChatPage> {
     );
     debugPrint("User message: ${message.text}");
     _addMessage(textMessage);
-    debugPrint("Saving mesasge: ${message.text}");
+    debugPrint("Saving message: ${message.text}");
     _saveMessage(message.text, MessageRole.user);
     debugPrint("Saved, now completing: ${message.text}");
     _completeChat(message.text);

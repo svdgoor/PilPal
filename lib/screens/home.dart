@@ -1,5 +1,6 @@
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -197,14 +198,16 @@ class _HomeState extends State<Home> {
         onPressed: () {
           _apiKeyTest(true, () {
             _assistantTest(true, () {
+              ChatItem newQuestion = ChatItem(
+                'New Question',
+                HiveList(Hive.box('messages')),
+              );
+              Hive.box('chats').add(newQuestion);
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ChatPage(
-                    chatItem: ChatItem(
-                      'New Question',
-                      HiveList(Hive.box('messages')),
-                    ),
+                    chatItem: newQuestion,
                     assistant: assistant!,
                     instance: instance!,
                   ),
