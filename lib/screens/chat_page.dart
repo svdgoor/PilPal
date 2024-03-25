@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:chat_gpt_sdk/chat_gpt_sdk.dart' as newOpenAI;
+import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
@@ -20,7 +21,7 @@ class ChatPage extends StatefulWidget {
       required this.instance});
 
   final MedicineAssistant assistant;
-  final newOpenAI.OpenAI instance;
+  final OpenAI instance;
   final ChatItem chatItem;
 
   @override
@@ -29,7 +30,7 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final List<types.Message> _messages = [];
-  final List<newOpenAI.Messages> _aiMessages = [];
+  final List<Messages> _aiMessages = [];
   late types.User ai;
   late types.User user;
   late Box messageBox;
@@ -65,11 +66,9 @@ class _ChatPageState extends State<ChatPage> {
       _messages.insert(0, textMessage);
 
       // construct chatgpt messages
-      _aiMessages.add(newOpenAI.Messages(
+      _aiMessages.add(Messages(
         content: messageItem.message,
-        role: messageItem.role == MessageRole.ai
-            ? newOpenAI.Role.assistant
-            : newOpenAI.Role.user,
+        role: messageItem.role == MessageRole.ai ? Role.assistant : Role.user,
       ));
     }
   }
@@ -81,60 +80,98 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _completeChat(String prompt) async {
-    _aiMessages.add(newOpenAI.Messages(
-      role: newOpenAI.Role.user,
+    _aiMessages.add(Messages(
+      role: Role.user,
       content: prompt,
     ));
 
-    newOpenAI.CreateThreadAndRunData data = await widget.instance.threads.runs
+    debugPrint("Prompt: $prompt");
+    CreateThreadAndRunData data = await widget.instance.threads.runs
         .createThreadAndRun(
-            request: newOpenAI.CreateThreadAndRun(
+            request: CreateThreadAndRun(
                 assistantId: widget.assistant.assistant.id,
                 thread: {
           "messages": _aiMessages,
         }));
-    newOpenAI.CreateRunResponse? runResponse;
+
+    // start timer for timeout
+    bool cancel = false;
+    Timer timer = Timer(const Duration(seconds: 20), () {
+      debugPrint("Timeout");
+      cancel = true;
+    });
+
+    isAiTyping = true;
+
+    CreateRunResponse? runResponse;
     while (runResponse == null ||
         runResponse.status == "queued" ||
         runResponse.status == "in_progress") {
       runResponse = await widget.instance.threads.runs
           .retrieveRun(runId: data.id, threadId: data.threadId);
+      if (cancel) {
+        debugPrint("Retrieving run timed out (20s)");
+        isAiTyping = false;
+        return;
+      }
     }
-    String mId = runResponse.stepDetails!.messageCreation.messageId;
 
-    newOpenAI.MessageData mData = await widget.instance.threads.messages
-        .retrieveMessage(threadId: data.threadId, messageId: mId);
+    if (runResponse.status != "completed") {
+      debugPrint("Run failed! Status: ${runResponse.status}");
+      timer.cancel();
+      isAiTyping = false;
+      return;
+    }
+    debugPrint("Run completed successfully, retrieving message...");
 
-    debugPrint(mData.toJson().toString());
-    //   // existing id: just update to the same text bubble
-    //   if (chatResponseId == chatStreamEvent.id) {
-    //     chatResponseContent +=
-    //         chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
+    ListRun? stepDetails;
+    while (stepDetails == null ||
+        stepDetails.data.last.stepDetails == null ||
+        stepDetails.data.last.stepDetails!.messageCreation == null) {
+      stepDetails = await widget.instance.threads.runs
+          .listRunSteps(threadId: data.threadId, runId: data.id);
+      if (cancel) {
+        debugPrint("Retrieving run timed out (20s)");
+        isAiTyping = false;
+        return;
+      }
+    }
+    if (stepDetails.data.last.stepDetails!.messageCreation == null) {
+      debugPrint("No message creation");
+      timer.cancel();
+      isAiTyping = false;
+      return;
+    }
+    debugPrint("Message created successfully");
+    timer.cancel();
 
-    //     _addMessageStream(chatResponseContent);
+    String messageId =
+        stepDetails.data.last.stepDetails!.messageCreation!.messageId;
+    debugPrint("Message ID: $messageId");
 
-    //     if (chatStreamEvent.choices.first.finishReason == "stop") {
-    //       isAiTyping = false;
-    //       _aiMessages.add(OpenAIChatCompletionChoiceMessageModel(
-    //         content: [
-    //           OpenAIChatCompletionChoiceMessageContentItemModel.text(
-    //               chatResponseContent)
-    //         ],
-    //         role: OpenAIChatMessageRole.assistant,
-    //       ));
-    //       _saveMessage(chatResponseContent, MessageRole.ai);
-    //       chatResponseId = '';
-    //       chatResponseContent = '';
-    //     }
-    //   } else {
-    //     // new id: create new text bubble
-    //     chatResponseId = chatStreamEvent.id;
-    //     chatResponseContent =
-    //         chatStreamEvent.choices.first.delta.content?[0]?.text ?? '';
-    //     onMessageReceived(id: chatResponseId, message: chatResponseContent);
-    //     isAiTyping = true;
-    //   }
-    // });
+    MessageData mData = await widget.instance.threads.messages
+        .retrieveMessage(threadId: data.threadId, messageId: messageId);
+
+    String chatResponseContent = mData.content
+        .map((content) => content.text)
+        .where((element) => element != null)
+        .map((text) => text!.value)
+        .join(' ');
+    debugPrint("Response text: $chatResponseContent");
+
+    _addMessageStream(chatResponseContent);
+
+    _aiMessages.add(Messages(
+      content: chatResponseContent,
+      role: Role.assistant,
+    ));
+
+    _saveMessage(chatResponseContent, MessageRole.ai);
+
+    chatResponseId = '';
+    chatResponseContent = '';
+
+    isAiTyping = false;
   }
 
   void onMessageReceived({String? id, required String message}) {
@@ -179,7 +216,8 @@ class _ChatPageState extends State<ChatPage> {
     );
     debugPrint("User message: ${message.text}");
     _addMessage(textMessage);
-    // _saveMessage(message.text, MessageRole.user);
+    debugPrint("User added, completing: ${message.text}");
+    _saveMessage(message.text, MessageRole.user);
     _completeChat(message.text);
   }
 
