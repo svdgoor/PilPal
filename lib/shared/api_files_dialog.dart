@@ -16,10 +16,10 @@ class ApiFilePage extends StatefulWidget {
       {super.key, required this.assistant, required this.instance});
 
   @override
-  _ApiFilePageState createState() => _ApiFilePageState();
+  ApiFilePageState createState() => ApiFilePageState();
 }
 
-class _ApiFilePageState extends State<ApiFilePage> {
+class ApiFilePageState extends State<ApiFilePage> {
   @override
   void initState() {
     super.initState();
