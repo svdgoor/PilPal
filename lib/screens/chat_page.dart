@@ -157,6 +157,7 @@ class _ChatPageState extends State<ChatPage> {
         .where((element) => element != null)
         .map((text) => text!.value)
         .join(' ');
+    // TODO: mData.content.first.text!.annotations
     debugPrint("Response text: $chatResponseContent");
 
     _addMessageStream(chatResponseContent);
@@ -216,8 +217,9 @@ class _ChatPageState extends State<ChatPage> {
     );
     debugPrint("User message: ${message.text}");
     _addMessage(textMessage);
-    debugPrint("User added, completing: ${message.text}");
+    debugPrint("Saving mesasge: ${message.text}");
     _saveMessage(message.text, MessageRole.user);
+    debugPrint("Saved, now completing: ${message.text}");
     _completeChat(message.text);
   }
 
