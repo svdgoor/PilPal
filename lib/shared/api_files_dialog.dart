@@ -1,9 +1,12 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/link_launcher.dart';
 import 'medicine_assistant.dart';
@@ -73,6 +76,26 @@ class ApiFilePageState extends State<ApiFilePage> {
       appBar: AppBar(
         title: const Text('Medicine Information Files'),
         actions: [
+          IconButton(
+            onPressed: () async {
+              if (await canLaunch("tel:112")) {
+                launch("tel:112");
+              } else {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Could not make emergency call. Are you on a phone?'),
+                  ),
+                );
+              }
+            },
+            tooltip: 'Emergency Call',
+            icon: const Icon(
+              Icons.phone_callback_sharp,
+              color: Colors.red,
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.cloud_upload),
             onPressed: () {

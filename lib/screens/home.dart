@@ -1,7 +1,10 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../constants.dart';
 import '../hive_model/chat_item.dart';
@@ -36,6 +39,9 @@ class _HomeState extends State<Home> {
     debugPrint("Home page init");
     setApiKeyOnStartup().then((_) async {
       tryLoadAssistant();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showDisclaimerDialog();
     });
   }
 
@@ -90,12 +96,55 @@ class _HomeState extends State<Home> {
     instance = OpenAI.instance.build(token: key);
   }
 
+  void showDisclaimerDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Disclaimer'),
+        content: const SizedBox(
+          width: 300, // Adjust the width as needed
+          child: Text(
+            'Please note that the system is using AI to answer questions. While we strive to provide accurate information, we cannot guarantee its accuracy. By clicking "Confirm", you acknowledge that we hold no liability for the answers.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('PilPal | Home'),
         actions: [
+          IconButton(
+            onPressed: () async {
+              if (await canLaunch("tel:112")) {
+                launch("tel:112");
+              } else {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Could not make emergency call. Are you on a phone?'),
+                  ),
+                );
+              }
+            },
+            tooltip: 'Emergency Call',
+            icon: const Icon(
+              Icons.phone_callback_sharp,
+              color: Colors.red,
+            ),
+          ),
           IconButton(
               onPressed: () {
                 showDialog(

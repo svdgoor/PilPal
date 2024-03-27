@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -7,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:hive/hive.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../hive_model/chat_item.dart';
 import '../hive_model/message_item.dart';
@@ -81,48 +84,46 @@ class _ChatPageState extends State<ChatPage> {
   /// A flag indicating whether the AI is currently typing or not.
   bool isAiTyping = false;
 
+  /// Initializes the state of the [ChatPage] widget.
+  ///
+  /// This method is called when the stateful widget is inserted into the tree.
+  /// It initializes the necessary variables and retrieves the chat history from Hive.
+  /// The chat history is then used to populate the chat view and construct chatgpt messages.
+  /// The [appBarTitle] is set to the title of the [ChatItem] passed to the widget.
   @override
   void initState() {
-    /// Initializes the state of the [ChatPage] widget.
-    ///
-    /// This method is called when the stateful widget is inserted into the tree.
-    /// It initializes the necessary variables and retrieves the chat history from Hive.
-    /// The chat history is then used to populate the chat view and construct chatgpt messages.
-    /// The [appBarTitle] is set to the title of the [ChatItem] passed to the widget.
-    void initState() {
-      super.initState();
+    super.initState();
 
-      // Initialize AI and user users
-      ai = const types.User(id: 'ai', firstName: 'AI');
-      user = const types.User(id: 'user', firstName: 'You');
+    // Initialize AI and user users
+    ai = const types.User(id: 'ai', firstName: 'AI');
+    user = const types.User(id: 'user', firstName: 'You');
 
-      // Retrieve the 'messages' box from Hive
-      messageBox = Hive.box('messages');
+    // Retrieve the 'messages' box from Hive
+    messageBox = Hive.box('messages');
 
-      // Set the appBarTitle to the title of the chatItem
-      appBarTitle = widget.chatItem.title;
+    // Set the appBarTitle to the title of the chatItem
+    appBarTitle = widget.chatItem.title;
 
-      // Read chat history from Hive and populate chat view
-      for (var messageItem in widget.chatItem.messages) {
-        messageItem as MessageItem;
+    // Read chat history from Hive and populate chat view
+    for (var messageItem in widget.chatItem.messages) {
+      messageItem as MessageItem;
 
-        // Create a text message based on the messageItem
-        final textMessage = types.TextMessage(
-          author: messageItem.role == MessageRole.ai ? ai : user,
-          createdAt: messageItem.createdAt.millisecondsSinceEpoch,
-          id: randomString(),
-          text: messageItem.message,
-        );
+      // Create a text message based on the messageItem
+      final textMessage = types.TextMessage(
+        author: messageItem.role == MessageRole.ai ? ai : user,
+        createdAt: messageItem.createdAt.millisecondsSinceEpoch,
+        id: randomString(),
+        text: messageItem.message,
+      );
 
-        // Insert the text message at the beginning of the _messages list
-        _messages.insert(0, textMessage);
+      // Insert the text message at the beginning of the _messages list
+      _messages.insert(0, textMessage);
 
-        // Construct chatgpt messages based on the messageItem
-        _aiMessages.add(Messages(
-          content: messageItem.message,
-          role: messageItem.role == MessageRole.ai ? Role.assistant : Role.user,
-        ));
-      }
+      // Construct chatgpt messages based on the messageItem
+      _aiMessages.add(Messages(
+        content: messageItem.message,
+        role: messageItem.role == MessageRole.ai ? Role.assistant : Role.user,
+      ));
     }
   }
 
@@ -310,6 +311,28 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(appBarTitle),
+        actions: [
+          IconButton(
+            onPressed: () async {
+              if (await canLaunch("tel:112")) {
+                launch("tel:112");
+              } else {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Could not make emergency call. Are you on a phone?'),
+                  ),
+                );
+              }
+            },
+            tooltip: 'Emergency Call',
+            icon: const Icon(
+              Icons.phone_callback_sharp,
+              color: Colors.red,
+            ),
+          ),
+        ],
       ),
       body: Chat(
         typingIndicatorOptions: TypingIndicatorOptions(
