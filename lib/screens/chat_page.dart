@@ -13,12 +13,36 @@ import '../hive_model/message_item.dart';
 import '../hive_model/message_role.dart';
 import '../shared/medicine_assistant.dart';
 
+/// A screen that displays a chat interface for communicating with an AI assistant.
+///
+/// This screen allows users to have a conversation with an AI assistant using a chat interface.
+/// It displays a list of messages exchanged between the user and the assistant.
+/// Users can send messages to the assistant and receive responses in real-time.
+///
+/// The [ChatPage] class is a stateful widget that manages the state of the chat screen.
+/// It initializes the necessary variables and widgets, retrieves chat history from Hive,
+/// and handles user interactions such as sending messages and displaying typing indicators.
+///
+/// To use this screen, create an instance of [ChatPage] and pass in the required parameters:
+/// - [assistant]: The [MedicineAssistant] object representing the AI assistant.
+/// - [instance]: The [OpenAI] instance used for making API calls.
+/// - [chatItem]: The [ChatItem] object representing the chat conversation.
+///
+/// Example usage:
+/// ```dart
+/// ChatPage(
+///   assistant: MedicineAssistant(),
+///   instance: OpenAI(),
+///   chatItem: ChatItem(),
+/// )
+/// ```
 class ChatPage extends StatefulWidget {
-  const ChatPage(
-      {super.key,
-      required this.chatItem,
-      required this.assistant,
-      required this.instance});
+  const ChatPage({
+    super.key,
+    required this.assistant,
+    required this.instance,
+    required this.chatItem,
+  });
 
   final MedicineAssistant assistant;
   final OpenAI instance;
@@ -28,54 +52,104 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
+/// The state class for the ChatPage widget.
+///
+/// This class manages the state of the ChatPage widget, including the list of messages,
+/// the AI messages, the AI and user objects, the messageBox, the appBarTitle, and the
+/// isAiTyping flag. It also provides methods for initializing the state, generating a
+/// random string, completing the chat, adding a message to the chat, saving a message
+/// to the Hive database, handling the send button press, and building the widget.
 class _ChatPageState extends State<ChatPage> {
+  /// List of messages exchanged between the AI and the user.
   final List<types.Message> _messages = [];
+
+  /// List of AI-generated messages.
   final List<Messages> _aiMessages = [];
+
+  /// The AI user.
   late types.User ai;
+
+  /// The user.
   late types.User user;
+
+  /// The message box.
   late Box messageBox;
 
+  /// The title of the app bar in the chat page.
   late String appBarTitle;
 
+  /// A flag indicating whether the AI is currently typing or not.
   bool isAiTyping = false;
 
   @override
   void initState() {
-    super.initState();
-    ai = const types.User(id: 'ai', firstName: 'AI');
-    user = const types.User(id: 'user', firstName: 'You');
+    /// Initializes the state of the [ChatPage] widget.
+    ///
+    /// This method is called when the stateful widget is inserted into the tree.
+    /// It initializes the necessary variables and retrieves the chat history from Hive.
+    /// The chat history is then used to populate the chat view and construct chatgpt messages.
+    /// The [appBarTitle] is set to the title of the [ChatItem] passed to the widget.
+    void initState() {
+      super.initState();
 
-    messageBox = Hive.box('messages');
+      // Initialize AI and user users
+      ai = const types.User(id: 'ai', firstName: 'AI');
+      user = const types.User(id: 'user', firstName: 'You');
 
-    appBarTitle = widget.chatItem.title;
+      // Retrieve the 'messages' box from Hive
+      messageBox = Hive.box('messages');
 
-    // read chat history from Hive
-    for (var messageItem in widget.chatItem.messages) {
-      messageItem as MessageItem;
-      // Add to chat view
-      final textMessage = types.TextMessage(
-        author: messageItem.role == MessageRole.ai ? ai : user,
-        createdAt: messageItem.createdAt.millisecondsSinceEpoch,
-        id: randomString(),
-        text: messageItem.message,
-      );
+      // Set the appBarTitle to the title of the chatItem
+      appBarTitle = widget.chatItem.title;
 
-      _messages.insert(0, textMessage);
+      // Read chat history from Hive and populate chat view
+      for (var messageItem in widget.chatItem.messages) {
+        messageItem as MessageItem;
 
-      // construct chatgpt messages
-      _aiMessages.add(Messages(
-        content: messageItem.message,
-        role: messageItem.role == MessageRole.ai ? Role.assistant : Role.user,
-      ));
+        // Create a text message based on the messageItem
+        final textMessage = types.TextMessage(
+          author: messageItem.role == MessageRole.ai ? ai : user,
+          createdAt: messageItem.createdAt.millisecondsSinceEpoch,
+          id: randomString(),
+          text: messageItem.message,
+        );
+
+        // Insert the text message at the beginning of the _messages list
+        _messages.insert(0, textMessage);
+
+        // Construct chatgpt messages based on the messageItem
+        _aiMessages.add(Messages(
+          content: messageItem.message,
+          role: messageItem.role == MessageRole.ai ? Role.assistant : Role.user,
+        ));
+      }
     }
   }
 
+  /// Generates a random string.
+  ///
+  /// This function uses a secure random number generator to generate a list of
+  /// 16 random integers between 0 and 255. It then encodes the list using
+  /// base64Url encoding and returns the resulting string.
   String randomString() {
     final random = Random.secure();
     final values = List<int>.generate(16, (i) => random.nextInt(255));
     return base64UrlEncode(values);
   }
 
+  /// Completes the chat by sending the user's prompt to the AI and retrieving the AI's response.
+  ///
+  /// The [prompt] parameter represents the user's prompt.
+  /// This method adds the user's prompt to the [_aiMessages] list as a user message.
+  /// It then creates a map [m] to store the messages in the required format.
+  /// The method loops through each message in [_aiMessages] and adds it to the [m] map.
+  /// After that, it creates a thread and runs the data using the [createThreadAndRun] method.
+  /// A timer is started to handle timeouts, and a while loop is used to retrieve the run response.
+  /// If the run response is not completed, the method returns.
+  /// If the run response is completed, it retrieves the message ID from the run response.
+  /// If the message ID is null, it retrieves the step details and creation data until the creation data is not null.
+  /// Finally, it retrieves the message data using the retrieved message ID and adds the AI's response to the [_aiMessages] list as an assistant message.
+  /// The method also saves the AI's response and updates the state.
   void _completeChat(String prompt) async {
     _aiMessages.add(Messages(
       role: Role.user,
@@ -90,7 +164,7 @@ class _ChatPageState extends State<ChatPage> {
         "content": message.content,
       });
     }
-    // debugPrint(m.toString());
+
     CreateThreadAndRunData data = await widget.instance.threads.runs
         .createThreadAndRun(
             request: CreateThreadAndRun(
@@ -136,17 +210,16 @@ class _ChatPageState extends State<ChatPage> {
 
     if (messageID == null) {
       ListRun? stepDetails;
-      while (stepDetails == null ||
-          stepDetails.data.last.stepDetails == null ||
-          stepDetails.data.last.stepDetails!.messageCreation == null) {
+      MessageCreation? creationData;
+      while (creationData == null) {
         stepDetails = await widget.instance.threads.runs
             .listRunSteps(threadId: data.threadId, runId: data.id);
-        // ignore: unnecessary_null_comparison
-        debugPrint(
-            "Run: ${stepDetails.toJson()}, bools: ${stepDetails == null}, ${stepDetails.data.last.stepDetails == null}, ${stepDetails.data.last.stepDetails!.messageCreation == null}");
-        if (stepDetails.data.last.stepDetails != null) {
-          debugPrint("StepDetails: ${stepDetails.toJson()}");
-        }
+        creationData = stepDetails.data
+            .firstWhere(
+                (element) => element.stepDetails!.messageCreation != null)
+            .stepDetails!
+            .messageCreation;
+        debugPrint("Message creation: $creationData");
         if (cancel) {
           debugPrint("Retrieving run timed out (20s)");
           setState(() {
@@ -155,24 +228,18 @@ class _ChatPageState extends State<ChatPage> {
           return;
         }
       }
-      if (stepDetails.data.last.stepDetails!.messageCreation == null) {
-        debugPrint("No message creation");
-        timer.cancel();
-        setState(() {
-          isAiTyping = false;
-        });
-        return;
-      }
       debugPrint("Message created successfully");
       timer.cancel();
 
-      messageID = stepDetails.data.last.stepDetails!.messageCreation!.messageId;
+      messageID = creationData.messageId;
     }
 
     debugPrint("Message ID: $messageID");
 
     MessageData mData = await widget.instance.threads.messages
         .retrieveMessage(threadId: data.threadId, messageId: messageID);
+
+    debugPrint("Message data: ${mData.toJson()}");
 
     String chatResponseContent = mData.content
         .map((content) => content.text)
@@ -199,7 +266,7 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  // add new bubble to chat
+  /// add new bubble to chat
   void _addMessage(types.Message message) {
     setState(() {
       _messages.insert(0, message);
@@ -214,6 +281,15 @@ class _ChatPageState extends State<ChatPage> {
     widget.chatItem.save();
   }
 
+  /// Handles the event when the send button is pressed.
+  ///
+  /// This method takes a [types.PartialText] message as input and performs the following steps:
+  /// 1. Creates a [types.TextMessage] object with the author, creation timestamp, ID, and text from the input message.
+  /// 2. Prints the user message to the debug console.
+  /// 3. Adds the text message to the chat.
+  /// 4. Saves the user message with the role of [MessageRole.user].
+  /// 5. Prints the saved message to the debug console.
+  /// 6. Completes the chat with the input message.
   void _handleSendPressed(types.PartialText message) async {
     final textMessage = types.TextMessage(
       author: user,

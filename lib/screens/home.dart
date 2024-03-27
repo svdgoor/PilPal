@@ -1,6 +1,5 @@
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,41 +18,60 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  /// A list of chat items.
   List<ChatItem> chats = [];
+
+  /// The medicine assistant.
   MedicineAssistant? assistant;
+
+  /// The OpenAI instance.
   OpenAI? instance;
 
+  /// Initializes the state of the home page.
+  /// This method is called when the widget is inserted into the tree.
+  /// It sets up the initial state of the widget and performs any necessary setup operations.
   @override
   void initState() {
     super.initState();
     debugPrint("Home page init");
-    // try to build state as we start the app
     setApiKeyOnStartup().then((_) async {
       tryLoadAssistant();
     });
   }
 
+  /// Asynchronously tries to load the assistant.
+  /// This method checks if the API key is set, retrieves the assistant data,
+  /// recreates the assistant, and updates the UI with the loaded assistant.
+  /// If the assistant is already loaded, it retrieves and stores the assistant files.
+  /// If the API key is not set, it logs a debug message.
   Future<void> tryLoadAssistant() async {
     debugPrint("Attempting to load assistant");
+
     _apiKeyTest(false, () async {
       debugPrint("API key set, checking assistant");
+
       if (assistant == null) {
         debugPrint("Assistant not loaded, attempting to load");
+
         List<AssistantData> value =
             await MedicineAssistant.listAssistant(instance!);
         debugPrint(
             "Retrieved assistants: ${value.map((assistant) => assistant.name).toList()}");
+
         if (value.isEmpty || value.length > 1) {
           return;
         }
+
         // setstate uipdate
         assistant = await MedicineAssistant.recreateAssistant(
             instance!, value.first.id);
         setState(() {/* Update tiles with assistant */});
+
         debugPrint("Assistant loaded: ${assistant!.assistant.name}");
         debugPrint(
             "Files: ${assistant!.files.map((e) => "${e.name} (${e.id})").join(', ')}");
       }
+
       _assistantTest(false, () {
         assistant!.retrieveAndStoreAssistantFiles();
       });
@@ -62,6 +80,9 @@ class _HomeState extends State<Home> {
     });
   }
 
+  /// Sets the API key on startup by retrieving it from SharedPreferences.
+  /// If the API key is not found or is empty, the function returns without setting the key.
+  /// Otherwise, it sets the API key for the OpenAI instance.
   Future<void> setApiKeyOnStartup() async {
     final sp = await SharedPreferences.getInstance();
     var key = sp.getString(spOpenApiKey);
@@ -222,7 +243,17 @@ class _HomeState extends State<Home> {
     );
   }
 
-  // Wraps a function that depends on the API being setup
+  /// Performs an API key test.
+  ///
+  /// This method checks if the API key is available. If the API key is not available,
+  /// it shows a snackbar with an option to add the key. If the key is added successfully,
+  /// the [onSuccess] callback is called. If the key is not added or if an [onFailure]
+  /// callback is provided, the [onFailure] callback is called.
+  ///
+  /// Parameters:
+  /// - [notify]: A boolean value indicating whether to show a snackbar if the key is not added.
+  /// - [onSuccess]: A callback function to be called when the key is added successfully.
+  /// - [onFailure]: An optional callback function to be called when the key is not added.
   void _apiKeyTest(bool notify, Function onSuccess, {Function? onFailure}) {
     if (instance == null) {
       if (onFailure != null) {
@@ -261,6 +292,10 @@ class _HomeState extends State<Home> {
     }
   }
 
+  /// A method to test the assistant.
+  ///
+  /// The [notify] parameter determines whether to show a notification if the assistant is not selected.
+  /// The [onSuccess] callback function is called when the assistant is selected or already exists.
   void _assistantTest(bool notify, Function onSuccess) {
     if (assistant == null) {
       if (!notify) return;
@@ -268,19 +303,20 @@ class _HomeState extends State<Home> {
         SnackBar(
           content: const Text("Can't open this page. Assistant not selected."),
           action: SnackBarAction(
-              label: 'Select assistant',
-              onPressed: () {
-                showDialog(
-                        context: context,
-                        builder: (_) => _assistantSetupPrompt(OpenAI.instance))
-                    .then(
-                  (value) {
-                    if (assistant != null) {
-                      onSuccess();
-                    }
-                  },
-                );
-              }),
+            label: 'Select assistant',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => _assistantSetupPrompt(OpenAI.instance),
+              ).then(
+                (value) {
+                  if (assistant != null) {
+                    onSuccess();
+                  }
+                },
+              );
+            },
+          ),
         ),
       );
     } else {
@@ -288,6 +324,17 @@ class _HomeState extends State<Home> {
     }
   }
 
+  /// Widget for displaying the assistant setup prompt.
+  ///
+  /// This widget is used to prompt the user to select an assistant or create a new one.
+  /// It displays a dialog with a title, subtitle, a dropdown list of available assistants,
+  /// and buttons for selecting an assistant, creating a new assistant, and canceling the prompt.
+  ///
+  /// Parameters:
+  /// - [instance]: An instance of the OpenAI class.
+  ///
+  /// Returns:
+  /// A [Widget] representing the assistant setup prompt.
   Widget _assistantSetupPrompt(OpenAI instance) {
     Text title;
     Text subtitle;
