@@ -158,10 +158,11 @@ class _ChatPageState extends State<ChatPage> {
     ));
 
     debugPrint("Prompt: $prompt");
-    var m = {"messages": []}; // TODO implement
+    var m = {"messages": []};
     for (var message in _aiMessages) {
       m["messages"]!.add({
-        "role": "user", // Note: AI does not seem to be allowed but it works
+        "role":
+            "user", // Note: Neither 'AI' nor 'assistant' seem to be allowed but it works
         "content": message.content,
       });
     }
@@ -169,7 +170,7 @@ class _ChatPageState extends State<ChatPage> {
     CreateThreadAndRunData data = await widget.instance.threads.runs
         .createThreadAndRun(
             request: CreateThreadAndRun(
-                assistantId: widget.assistant.assistant.id, thread: null));
+                assistantId: widget.assistant.assistant.id, thread: m));
 
     // start timer for timeout
     bool cancel = false;
@@ -242,11 +243,16 @@ class _ChatPageState extends State<ChatPage> {
 
     debugPrint("Message data: ${mData.toJson()}");
 
-    String chatResponseContent = mData.content
-        .map((content) => content.text)
-        .where((element) => element != null)
-        .map((text) => text!.value)
-        .join(' ');
+    String chatResponseContent = mData.content.last.text!.value;
+
+    for (var annotation in mData.content.last.text!.annotations) {
+      if (annotation["type"] != "file_citation") continue;
+      String quoteText = annotation["text"];
+      String quote = annotation["file_citation"]["quote"];
+      chatResponseContent =
+          chatResponseContent.replaceAll(quoteText, "[\"$quote\"]");
+    }
+
     debugPrint("Response text: $chatResponseContent");
 
     _addMessage(types.TextMessage(
