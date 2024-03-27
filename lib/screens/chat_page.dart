@@ -250,7 +250,7 @@ class _ChatPageState extends State<ChatPage> {
       String quoteText = annotation["text"];
       String quote = annotation["file_citation"]["quote"];
       chatResponseContent =
-          chatResponseContent.replaceAll(quoteText, "[\"$quote\"]");
+          chatResponseContent.replaceAll(quoteText, " (\"$quote\")");
     }
 
     debugPrint("Response text: $chatResponseContent");
